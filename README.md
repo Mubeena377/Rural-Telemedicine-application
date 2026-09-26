@@ -14,7 +14,6 @@ The application provides features such as patient registration, symptom-based tr
 - AI-assisted symptom triage
 - Basic first-aid guidance
 - Medical consultation
-- Voice-based app control
 - Medical information upload
 - Multilingual support
 - Medicine reminders
