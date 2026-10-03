@@ -6,6 +6,19 @@ import psycopg2
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
 import joblib
+import time
+from agora_token_builder import RtcTokenBuilder
+
+load_dotenv()
+print("AGORA_APP_ID exists:", "AGORA_APP_ID" in os.environ)
+print("AGORA_APP_CERTIFICATE exists:", "AGORA_APP_CERTIFICATE" in os.environ)
+AGORA_APP_ID = os.getenv("AGORA_APP_ID")
+AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE")
+print("Agora App ID loaded:", bool(os.getenv("AGORA_APP_ID")))
+print("Agora Certificate loaded:", bool(os.getenv("AGORA_APP_CERTIFICATE")))
+print("Agora configuration variables set:",
+      bool(AGORA_APP_ID),
+      bool(AGORA_APP_CERTIFICATE))
 
 app = Flask(__name__)
 CORS(app)
@@ -1030,7 +1043,676 @@ def get_doctors():
             "status": "error",
             "message": str(e)
         }), 500
+@app.route('/api/doctors/register', methods=['POST'])
+def register_doctor():
+    try:
+        data = request.get_json()
 
+        full_name = data.get('full_name')
+        phone = data.get('phone')
+        registration_number = data.get('registration_number')
+        qualification = data.get('qualification')
+        specialization_id = data.get('specialization_id')
+        experience_years = data.get('experience_years')
+        hospital_id = data.get('hospital_id')
+
+        # Basic validation
+        if not full_name or not phone:
+            return jsonify({
+                "status": "error",
+                "message": "Full name and phone are required"
+            }), 400
+
+        if not registration_number:
+            return jsonify({
+                "status": "error",
+                "message": "Medical registration number is required"
+            }), 400
+
+        if not qualification:
+            return jsonify({
+                "status": "error",
+                "message": "Qualification is required"
+            }), 400
+
+        if not specialization_id:
+            return jsonify({
+                "status": "error",
+                "message": "Specialization is required"
+            }), 400
+
+        if experience_years is None:
+            return jsonify({
+                "status": "error",
+                "message": "Experience is required"
+            }), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check whether phone already exists
+        cursor.execute(
+            "SELECT user_id FROM users WHERE phone = %s",
+            (phone,)
+        )
+
+        existing_user = cursor.fetchone()
+
+        if existing_user:
+            cursor.close()
+            conn.close()
+
+            return jsonify({
+                "status": "error",
+                "message": "A user with this phone number already exists"
+            }), 409
+
+        # Create user account
+        password_hash = generate_password_hash(
+            "doctor_temp_password"
+        )
+
+        cursor.execute("""
+            INSERT INTO users
+                (full_name, phone, password_hash, role_id, status)
+            VALUES
+                (%s, %s, %s, 1, 'Active')
+            RETURNING user_id
+        """, (
+            full_name,
+            phone,
+            password_hash
+        ))
+
+        user_id = cursor.fetchone()[0]
+
+        # Create doctor
+        cursor.execute("""
+            INSERT INTO doctors
+                (
+                    user_id,
+                    specialization_id,
+                    qualification,
+                    experience_years,
+                    license_number,
+                    is_available
+                )
+            VALUES
+                (%s, %s, %s, %s, %s, 'Y')
+            RETURNING doctor_id
+        """, (
+            user_id,
+            specialization_id,
+            qualification,
+            experience_years,
+            registration_number
+        ))
+
+        doctor_id = cursor.fetchone()[0]
+
+        # Connect doctor to hospital if hospital_id was supplied
+        if hospital_id is not None:
+
+            cursor.execute("""
+                SELECT hospital_id
+                FROM hospitals
+                WHERE hospital_id = %s
+            """, (hospital_id,))
+
+            hospital_exists = cursor.fetchone()
+
+            if not hospital_exists:
+                conn.rollback()
+                cursor.close()
+                conn.close()
+
+                return jsonify({
+                    "status": "error",
+                    "message": "Selected hospital does not exist"
+                }), 400
+
+            cursor.execute("""
+                INSERT INTO doctor_hospitals
+                    (doctor_id, hospital_id, is_primary)
+                VALUES
+                    (%s, %s, 'Y')
+            """, (
+                doctor_id,
+                hospital_id
+            ))
+
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "message": "Doctor registered successfully",
+            "user_id": user_id,
+            "doctor_id": doctor_id
+        }), 201
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+@app.route('/api/doctors/login', methods=['POST'])
+def doctor_login():
+    try:
+        data = request.get_json()
+
+        phone = data.get('phone')
+
+        if not phone:
+            return jsonify({
+                "status": "error",
+                "message": "Phone number is required"
+            }), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                d.doctor_id,
+                u.user_id,
+                u.full_name,
+                u.phone,
+                d.specialization_id,
+                s.spec_name,
+                d.qualification,
+                d.experience_years,
+                d.license_number,
+                d.is_available
+            FROM doctors d
+            JOIN users u
+                ON d.user_id = u.user_id
+            JOIN specializations s
+                ON d.specialization_id = s.spec_id
+            WHERE u.phone = %s
+              AND u.role_id = 1
+              AND u.status = 'Active'
+        """, (phone,))
+
+        doctor = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        if not doctor:
+            return jsonify({
+                "status": "error",
+                "message": "No registered doctor found with this phone number"
+            }), 404
+
+        return jsonify({
+            "status": "success",
+            "message": "Doctor found",
+            "doctor": {
+                "doctor_id": doctor[0],
+                "user_id": doctor[1],
+                "full_name": doctor[2],
+                "phone": doctor[3],
+                "specialization_id": doctor[4],
+                "specialization": doctor[5],
+                "qualification": doctor[6],
+                "experience_years": doctor[7],
+                "license_number": doctor[8],
+                "is_available": doctor[9]
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+@app.route('/api/doctors/<int:doctor_id>/appointments', methods=['GET'])
+def get_doctor_appointments(doctor_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+          SELECT
+           a.appointment_id,
+           a.patient_id,
+           u.full_name AS patient_name,
+           a.appointment_date,
+           a.start_time,
+           a.end_time,
+           a.consultation_mode,
+           a.reason_for_visit,
+           a.status
+        FROM appointments a
+        JOIN patients p
+           ON a.patient_id = p.patient_id
+        JOIN users u
+           ON p.user_id = u.user_id
+        WHERE a.doctor_id = %s
+        ORDER BY a.appointment_date ASC,
+              a.start_time ASC
+   """, (doctor_id,))
+
+        rows = cursor.fetchall()
+
+        appointments = []
+
+        for row in rows:
+            appointments.append({
+                "appointment_id": row[0],
+                "patient_id": row[1],
+                "patient_name": row[2],
+                "appointment_date": str(row[3]),
+                "start_time": str(row[4]),
+                "end_time": str(row[5]),
+                "consultation_mode": row[6],
+                "reason_for_visit": row[7],
+                "status": row[8],
+            })
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "appointments": appointments
+        }), 200
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.close()
+
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+@app.route('/api/doctors/<int:doctor_id>/appointments/<int:appointment_id>/complete', methods=['PUT'])
+def complete_doctor_appointment(doctor_id, appointment_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE appointments
+            SET status = 'Completed'
+            WHERE appointment_id = %s
+              AND doctor_id = %s
+              AND status = 'Scheduled'
+            RETURNING appointment_id
+        """, (appointment_id, doctor_id))
+
+        updated_appointment = cursor.fetchone()
+
+        if not updated_appointment:
+            conn.rollback()
+            cursor.close()
+            conn.close()
+
+            return jsonify({
+                "status": "error",
+                "message": "Appointment not found or is not scheduled."
+            }), 404
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "message": "Appointment marked as completed.",
+            "appointment_id": updated_appointment[0]
+        }), 200
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/doctors/appointments/<int:appointment_id>/consultation', methods=['POST'])
+def save_consultation(appointment_id):
+    try:
+        data = request.get_json()
+
+        consultation_type = data.get('consultation_type')
+        chief_complaint = data.get('chief_complaint')
+        diagnosis = data.get('diagnosis')
+        notes = data.get('notes')
+        advice = data.get('advice')
+        follow_up_date = data.get('follow_up_date')
+
+        if not all([chief_complaint, diagnosis, notes, advice]):
+            return jsonify({
+                "status": "error",
+                "message": "Please provide all required consultation details."
+            }), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Verify that the appointment exists and is scheduled.
+        cursor.execute("""
+            SELECT appointment_id, doctor_id
+            FROM appointments
+            WHERE appointment_id = %s
+              AND status = 'Scheduled'
+              AND appointment_date + start_time <= CURRENT_TIMESTAMP
+        """, (appointment_id,))
+
+        appointment = cursor.fetchone()
+
+        if not appointment:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "status": "error",
+                "message": "Appointment is not available for consultation yet."
+            }), 404
+
+        cursor.execute("""
+            INSERT INTO consultations (
+                appointment_id,
+                consultation_type,
+                chief_complaint,
+                diagnosis,
+                notes,
+                advice,
+                follow_up_date
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING consultation_id
+        """, (
+            appointment_id,
+            consultation_type,
+            chief_complaint,
+            diagnosis,
+            notes,
+            advice,
+            follow_up_date
+        ))
+
+        consultation_id = cursor.fetchone()[0]
+
+        cursor.execute("""
+            UPDATE appointments
+            SET status = 'Completed'
+            WHERE appointment_id = %s
+        """, (appointment_id,))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "message": "Consultation saved successfully.",
+            "consultation_id": consultation_id
+        }), 201
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+@app.route('/api/doctors/<int:doctor_id>/consultations', methods=['GET'])
+def get_doctor_consultations(doctor_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                a.appointment_id,
+                a.patient_id,
+                u.full_name AS patient_name,
+                a.appointment_date,
+                a.start_time,
+                a.end_time,
+                a.consultation_mode,
+                a.reason_for_visit,
+                a.status
+            FROM appointments a
+            JOIN patients p ON a.patient_id = p.patient_id
+            JOIN users u ON p.user_id = u.user_id
+            WHERE a.doctor_id = %s
+              AND a.status = 'Scheduled'
+              AND (a.appointment_date + a.start_time)
+                    <= CURRENT_TIMESTAMP::timestamp
+            ORDER BY a.appointment_date ASC, a.start_time ASC
+        """, (doctor_id,))
+
+        rows = cursor.fetchall()
+
+        consultations = []
+
+        for row in rows:
+            consultations.append({
+                "appointment_id": row[0],
+                "patient_id": row[1],
+                "patient_name": row[2],
+                "appointment_date": str(row[3]),
+                "start_time": str(row[4]),
+                "end_time": str(row[5]),
+                "consultation_mode": row[6],
+                "reason_for_visit": row[7],
+                "status": row[8]
+            })
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "consultations": consultations
+        }), 200
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.close()
+
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/doctors/<int:doctor_id>/consultation-history', methods=['GET'])
+def get_doctor_consultation_history(doctor_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                c.consultation_id,
+                c.appointment_id,
+                a.patient_id,
+                u.full_name AS patient_name,
+                a.appointment_date,
+                a.start_time,
+                a.end_time,
+                a.consultation_mode,
+                a.reason_for_visit,
+                c.consultation_type,
+                c.chief_complaint,
+                c.diagnosis,
+                c.notes,
+                c.advice,
+                c.follow_up_date,
+                c.created_at
+            FROM consultations c
+            JOIN appointments a
+                ON c.appointment_id = a.appointment_id
+            JOIN patients p
+                ON a.patient_id = p.patient_id
+            JOIN users u
+                ON p.user_id = u.user_id
+            WHERE a.doctor_id = %s
+              AND a.status = 'Completed'
+            ORDER BY c.created_at DESC
+        """, (doctor_id,))
+
+        rows = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+
+        
+        consultations = []
+
+        for row in rows:
+            consultation = dict(zip(columns, row))
+
+            for key, value in consultation.items():
+               if value is not None and hasattr(value, 'isoformat'):
+                   consultation[key] = value.isoformat()
+
+        consultations.append(consultation)
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "consultations": consultations
+        }), 200
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.close()
+
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500   
+ # ============================================================
+# GENERATE AGORA VIDEO CALL TOKEN
+# ============================================================
+
+@app.route("/api/appointments/<int:appointment_id>/video-token", methods=["GET"])
+def generate_video_token(appointment_id):
+
+    participant_id = request.args.get("participant_id", type=int)
+    participant_role = request.args.get("participant_role")
+
+    if not AGORA_APP_ID or not AGORA_APP_CERTIFICATE:
+        return jsonify({
+            "status": "error",
+            "message": "Agora configuration is missing"
+        }), 500
+
+    if not participant_id or participant_role not in ["patient", "doctor"]:
+        return jsonify({
+            "status": "error",
+            "message": "Valid participant details are required"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT patient_id, doctor_id, consultation_mode, status
+            FROM appointments
+            WHERE appointment_id = %s
+        """, (appointment_id,))
+
+        appointment = cursor.fetchone()
+
+        if not appointment:
+            return jsonify({
+                "status": "error",
+                "message": "Appointment not found"
+            }), 404
+
+        patient_id, doctor_id, consultation_mode, appointment_status = appointment
+
+        # Verify that the participant belongs to this appointment
+        if participant_role == "patient" and participant_id != patient_id:
+            return jsonify({
+                "status": "error",
+                "message": "Patient does not belong to this appointment"
+            }), 403
+
+        if participant_role == "doctor" and participant_id != doctor_id:
+            return jsonify({
+                "status": "error",
+                "message": "Doctor does not belong to this appointment"
+            }), 403
+
+        if consultation_mode != "Online":
+            return jsonify({
+                "status": "error",
+                "message": "This appointment is not an online consultation"
+            }), 400
+
+        if appointment_status != "Scheduled":
+            return jsonify({
+                "status": "error",
+                "message": "This appointment is not available for a video call"
+            }), 400
+
+        # Create the same channel for both participants
+        channel_name = f"rural_appt_{appointment_id}"
+
+        # Give patient and doctor different Agora UIDs
+        if participant_role == "patient":
+            agora_uid = patient_id
+        else:
+            agora_uid = doctor_id + 1000000000
+
+        # Token valid for one hour
+        expiry_time = int(time.time()) + 3600
+
+        token = RtcTokenBuilder.buildTokenWithUid(
+            AGORA_APP_ID,
+            AGORA_APP_CERTIFICATE,
+            channel_name,
+            agora_uid,
+            1,
+            expiry_time
+        )
+
+        return jsonify({
+            "status": "success",
+            "appointment_id": appointment_id,
+            "channel_name": channel_name,
+            "agora_uid": agora_uid,
+            "agora_app_id": AGORA_APP_ID,
+            "token": token,
+            "message": "Video call token generated successfully"
+        }), 200
+
+    except Exception as e:
+        print("Agora Token Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to generate video call token"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()     
 if __name__ == "__main__":
 
         app.run(

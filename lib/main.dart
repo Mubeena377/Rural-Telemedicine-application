@@ -8603,7 +8603,7 @@ List<Map<String, dynamic>> get pastAppointments {
     }
 
     final data = await ApiService.getAppointments(patientId);
-
+    print('APPOINTMENT DATA FROM API: $data');
     if (!mounted) return;
 
     setState(() {
@@ -8648,62 +8648,174 @@ List<Map<String, dynamic>> get pastAppointments {
   static const Color softBorder = Color(0xFFD9E5F1);
   static const Color greyText = Color(0xFF6E7F91);
 
-
-  void showAppointmentDetails(Map<String, dynamic> appointment) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+void showAppointmentDetails(Map<String, dynamic> appointment) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          tr('Appointment Details', selectedLanguage),
+          style: TextStyle(
+            color: darkBlue,
+            fontWeight: FontWeight.bold,
           ),
-          title: Text(
-            tr('Appointment Details',selectedLanguage),
-            style: TextStyle(
-              color: darkBlue,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Column(
+        ),
+        content: SingleChildScrollView(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                tr(appointment['doctor'] ?? '', selectedLanguage),
+                tr(
+                  appointment['doctor']?.toString() ?? '',
+                  selectedLanguage,
+                ),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: darkBlue,
                 ),
               ),
-              const SizedBox(height: 8),
+
+              const SizedBox(height: 6),
+
               Text(
-                tr(appointment['specialty'] ?? '', selectedLanguage),
+                tr(
+                  appointment['specialty']?.toString() ?? '',
+                  selectedLanguage,
+                ),
                 style: const TextStyle(
                   color: greyText,
                 ),
               ),
-              const SizedBox(height: 15),
-              Text(tr('Date: ${appointment['date'] ?? ''}', selectedLanguage)),
-              const SizedBox(height: 6),
-              Text(tr('Time: ${appointment['time'] ?? ''}', selectedLanguage)),
+
+              const SizedBox(height: 18),
+
+              _detailRow(
+                Icons.school_outlined,
+                'Qualification',
+                appointment['qualification']?.toString() ??
+                    'Not available',
+              ),
+
+              _detailRow(
+                Icons.work_outline,
+                'Experience',
+                '${appointment['experience_years'] ?? 'Not available'} years',
+              ),
+
+              _detailRow(
+                Icons.calendar_today,
+                'Appointment Date',
+                appointment['date']?.toString() ??
+                    'Not available',
+              ),
+
+              _detailRow(
+                Icons.access_time,
+                'Start Time',
+                appointment['time']?.toString() ??
+                    'Not available',
+              ),
+
+              _detailRow(
+                Icons.access_time_filled,
+                'End Time',
+                appointment['end_time']?.toString() ??
+                    'Not available',
+              ),
+
+              _detailRow(
+                Icons.video_call,
+                'Consultation Mode',
+                appointment['consultation_mode']?.toString() ??
+                    'Not available',
+              ),
+
+              _detailRow(
+                Icons.info_outline,
+                'Status',
+                appointment['status']?.toString() ??
+                    'Not available',
+              ),
+
+              _detailRow(
+                Icons.description_outlined,
+                'Reason for Visit',
+                appointment['reason_for_visit']?.toString() ??
+                    'Not provided',
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child:  Text(
-                tr('Close', selectedLanguage),
-                style: TextStyle(color: primaryBlue),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: Text(
+              tr('Close', selectedLanguage),
+              style: TextStyle(
+                color: primaryBlue,
               ),
             ),
-          ],
-        );
-      },
-    );
-  }
+          ),
+        ],
+      );
+    },
+  );
+}
 
+Widget _detailRow(
+  IconData icon,
+  String title,
+  String value,
+) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: primaryBlue,
+        ),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tr(title, selectedLanguage),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: greyText,
+                ),
+              ),
+
+              const SizedBox(height: 2),
+
+              Text(
+                tr(value, selectedLanguage),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
     void confirmCancel(Map<String, dynamic> appointment) {
     showDialog(
       context: context,
@@ -8721,8 +8833,11 @@ List<Map<String, dynamic>> get pastAppointments {
             ),
           ),
           content: Text(
-            tr('This appointment will be permanently removed from your appointments.', selectedLanguage),
-          ),
+         tr(
+          'This appointment will be marked as cancelled.',
+               selectedLanguage,
+             ),
+           ),
           actions: [
             TextButton(
               onPressed: () {
@@ -16481,38 +16596,141 @@ class _DoctorRegistrationScreenState
     }
   }
 
-  void registerDoctor() {
-    if (nameController.text.trim().isEmpty ||
-        phoneController.text.trim().isEmpty ||
-        registrationNumberController.text.trim().isEmpty ||
-        qualificationController.text.trim().isEmpty ||
-        specializationController.text.trim().isEmpty ||
-        experienceController.text.trim().isEmpty ||
-        hospitalController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all required fields.'),
-        ),
+Future<void> registerDoctor() async {
+  if (nameController.text.trim().isEmpty ||
+      phoneController.text.trim().isEmpty ||
+      registrationNumberController.text.trim().isEmpty ||
+      qualificationController.text.trim().isEmpty ||
+      specializationController.text.trim().isEmpty ||
+      experienceController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please fill all required fields'),
+      ),
+    );
+    return;
+  }
+
+  if (!otpVerified) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please verify your phone number'),
+      ),
+    );
+    return;
+  }
+
+  final experience =
+      int.tryParse(experienceController.text.trim());
+
+  if (experience == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please enter a valid experience in years'),
+      ),
+    );
+    return;
+  }
+
+  final specializationMap = {
+    'General Physician': 1,
+    'Cardiologist': 2,
+    'Pediatrician': 3,
+    'Dermatologist': 4,
+    'Ophthalmologist': 5,
+    'Gynecologist': 6,
+    'Pulmonologist': 7,
+    'Orthopedic': 8,
+    'Neurologist': 9,
+    'Dentist': 10,
+  };
+
+  final specializationId =
+      specializationMap[specializationController.text.trim()];
+
+  if (specializationId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please select a valid specialization'),
+      ),
+    );
+    return;
+  }
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return const Center(
+        child: CircularProgressIndicator(),
       );
-      return;
+    },
+  );
+
+  try {
+    final result = await ApiService.registerDoctor(
+      fullName: nameController.text.trim(),
+      phone: phoneController.text.trim(),
+      registrationNumber:
+          registrationNumberController.text.trim(),
+      qualification:
+          qualificationController.text.trim(),
+      specializationId: specializationId,
+      experienceYears: experience,
+    );
+
+    if (mounted) {
+      Navigator.pop(context);
     }
 
-    if (!otpVerified) {
+    if (result['status'] == 'success') {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please verify your phone number first.'),
+          content: Text('Doctor registration successful'),
         ),
       );
-      return;
-    }
 
-       Navigator.pushReplacement(
+      Navigator.pushReplacement(
         context,
-         MaterialPageRoute(
-        builder: (context) => const DoctorKycScreen(),
+        MaterialPageRoute(
+          builder: (context) => DoctorKycScreen(
+            doctorId: result['doctor_id'],
+            doctorName: nameController.text.trim(),
+            doctorSpecialization:
+                specializationController.text.trim(),
+            doctorQualification:
+                qualificationController.text.trim(),
+            doctorExperience: experience,
+            doctorAvailability: 'Y',
+          ),
+        ),
+      );
+    } else {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result['message'] ??
+                'Doctor registration failed',
+          ),
         ),
       );
     }
+  } catch (e) {
+    if (mounted) {
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Registration error: $e'),
+        ),
+      );
+    }
+  }
+}
 
   Widget inputField({
     required String label,
@@ -16607,11 +16825,40 @@ class _DoctorRegistrationScreenState
               hintText: 'Example: MBBS, MD',
             ),
 
-            inputField(
-              label: 'Specialization',
-              controller: specializationController,
-              hintText: 'Example: General Medicine',
-            ),
+            DropdownButtonFormField<String>(
+  value: specializationController.text.isEmpty
+      ? null
+      : specializationController.text,
+  decoration: InputDecoration(
+    labelText: 'Specialization',
+    prefixIcon: const Icon(Icons.medical_services),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+  ),
+  items: const [
+    'General Physician',
+    'Cardiologist',
+    'Pediatrician',
+    'Dermatologist',
+    'Ophthalmologist',
+    'Gynecologist',
+    'Pulmonologist',
+    'Orthopedic',
+    'Neurologist',
+    'Dentist',
+  ].map((specialization) {
+         return DropdownMenuItem<String>(
+         value: specialization,
+         child: Text(specialization),
+         );
+        }).toList(),
+         onChanged: (value) {
+         if (value != null) {
+         specializationController.text = value;
+       }
+      },
+    ),
 
             inputField(
               label: 'Years of Experience',
@@ -16714,7 +16961,39 @@ class _DoctorRegistrationScreenState
                 ),
               ),
             ),
+const SizedBox(height: 18),
 
+            Center(
+              child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                  const Text(
+                  'Already registered?',
+                    style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                   ),
+                 ),
+                  TextButton(
+                  onPressed: () {
+                  Navigator.push(
+                   context,
+                   MaterialPageRoute(
+                    builder: (context) => const DoctorLoginScreen(),
+                  ),
+                );
+              },
+              child: const Text(
+                 'Login',
+                  style: TextStyle(
+                   fontSize: 14,
+                 fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    ],
+  ),
+       ),
             const SizedBox(height: 20),
 
             const Center(
@@ -16800,7 +17079,7 @@ class DoctorRegistrationSuccessScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) =>
-                            const DoctorDashboardScreen(),
+                           const DoctorLoginScreen(),
                       ),
                     );
                   },
@@ -16819,8 +17098,22 @@ class DoctorRegistrationSuccessScreen extends StatelessWidget {
 }
 
 class DoctorKycScreen extends StatefulWidget {
-  const DoctorKycScreen({super.key});
+  final int doctorId;
+  final String doctorName;
+  final String doctorSpecialization;
+  final String doctorQualification;
+  final int doctorExperience;
+  final String doctorAvailability;
 
+  const DoctorKycScreen({
+    super.key,
+    required this.doctorId,
+    required this.doctorName,
+    required this.doctorSpecialization,
+    required this.doctorQualification,
+    required this.doctorExperience,
+    required this.doctorAvailability,
+  });
   @override
   State<DoctorKycScreen> createState() => _DoctorKycScreenState();
 }
@@ -16912,10 +17205,17 @@ class _DoctorKycScreenState extends State<DoctorKycScreen> {
                 Navigator.pop(context);
 
                 Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DoctorLoginScreen(),
-                  ),
+                       context,
+                      MaterialPageRoute(
+                       builder: (context) => DoctorDashboardScreen(
+                       doctorId: widget.doctorId,
+                       doctorName: widget.doctorName,
+                       doctorSpecialization: widget.doctorSpecialization,
+                       doctorQualification: widget.doctorQualification,
+                       doctorExperience: widget.doctorExperience,
+                       doctorAvailability: widget.doctorAvailability,
+                     ),
+                   ),
                 );
               },
               child: const Text('Continue'),
@@ -17228,25 +17528,63 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
   bool otpSent = false;
   bool otpVerified = false;
 
+ int? doctorId;
+String? doctorName;
+String? doctorSpecialization;
+String? doctorQualification;
+int? doctorExperience;
+String? doctorAvailability;
+
+
   @override
   void dispose() {
     phoneController.dispose();
     otpController.dispose();
     super.dispose();
   }
+  Future<void> sendOTP() async {
+  final phone = phoneController.text.trim();
 
-  void sendOTP() {
-    if (phoneController.text.trim().length != 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid 10-digit phone number.'),
-        ),
+  if (phone.length != 10) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please enter a valid 10-digit phone number.'),
+      ),
+    );
+    return;
+  }
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return const Center(
+        child: CircularProgressIndicator(),
       );
-      return;
-    }
+    },
+  );
+
+  final result = await ApiService.checkDoctorPhone(
+    phone: phone,
+  );
+
+  if (!mounted) return;
+
+  Navigator.pop(context);
+
+  if (result['status'] == 'success') {
+    final doctor = result['doctor'];
 
     setState(() {
+      doctorId = doctor['doctor_id'];
+      doctorName = doctor['full_name'];
+      doctorSpecialization = doctor['specialization'];
+      doctorQualification = doctor['qualification'];
+      doctorExperience = doctor['experience_years'];
+      doctorAvailability = doctor['is_available'];
+
       otpSent = true;
+      otpVerified = false;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -17254,8 +17592,16 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
         content: Text('OTP sent! Test OTP: 123456'),
       ),
     );
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['message'] ?? 'Doctor account not found.',
+        ),
+      ),
+    );
   }
-
+}
   void verifyOTP() {
     if (otpController.text.trim() == '123456') {
       setState(() {
@@ -17286,12 +17632,19 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
       return;
     }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const DoctorDashboardScreen(),
-      ),
-    );
+   Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(
+    builder: (context) => DoctorDashboardScreen(
+      doctorId: doctorId!,
+      doctorName: doctorName!,
+      doctorSpecialization: doctorSpecialization!,
+      doctorQualification: doctorQualification!,
+      doctorExperience: doctorExperience!,
+      doctorAvailability: doctorAvailability!,
+    ),
+  ),
+); 
   }
 
   Widget inputField({
@@ -17478,7 +17831,22 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
 // ============================================================
 
 class DoctorDashboardScreen extends StatelessWidget {
-  const DoctorDashboardScreen({super.key});
+  final int doctorId;
+  final String doctorName;
+  final String doctorSpecialization;
+  final String doctorQualification;
+  final int doctorExperience;
+  final String doctorAvailability;
+
+  const DoctorDashboardScreen({
+    super.key,
+    required this.doctorId,
+    required this.doctorName,
+    required this.doctorSpecialization,
+    required this.doctorQualification,
+    required this.doctorExperience,
+    required this.doctorAvailability,
+  });
 
   Widget dashboardCard({
     required BuildContext context,
@@ -17605,13 +17973,13 @@ class DoctorDashboardScreen extends StatelessWidget {
             // Doctor Welcome Section
             // ------------------------------------------------
 
-            const Text(
-              'Welcome, Doctor 👨‍⚕️',
-              style: TextStyle(
-                fontSize: 25,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(
+             'Welcome, $doctorName 👨‍⚕️',
+             style: const TextStyle(
+             fontSize: 25,
+            fontWeight: FontWeight.bold,
+           ),
+          ),
 
             const SizedBox(height: 6),
 
@@ -17651,7 +18019,7 @@ class DoctorDashboardScreen extends StatelessWidget {
 
                     const SizedBox(width: 15),
 
-                    const Expanded(
+                     Expanded(
                       child: Column(
                         crossAxisAlignment:
                             CrossAxisAlignment.start,
@@ -17677,12 +18045,16 @@ class DoctorDashboardScreen extends StatelessWidget {
                               SizedBox(width: 6),
 
                               Text(
-                                'Available for consultation',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.green,
-                                ),
-                              ),
+                              doctorAvailability == 'Y'
+                           ? 'Available for consultation'
+                           : 'Currently unavailable',
+                             style: TextStyle(
+                              fontSize: 13,
+                               color: doctorAvailability == 'Y'
+                              ? Colors.green
+                              : Colors.red,
+                               ),
+                             ),
                             ],
                           ),
                         ],
@@ -17747,7 +18119,9 @@ class DoctorDashboardScreen extends StatelessWidget {
                Navigator.push(
                   context,
                  MaterialPageRoute(
-                   builder: (context) => const DoctorAppointmentsScreen(),
+                   builder: (context) => DoctorAppointmentsScreen(
+                   doctorId: doctorId,
+                   ),
                  ),
                );
              },
@@ -17768,12 +18142,35 @@ class DoctorDashboardScreen extends StatelessWidget {
                 Navigator.push(
                  context,
                 MaterialPageRoute(
-                   builder: (context) => const DoctorConsultationsScreen(),
+                  builder: (context) => DoctorConsultationsScreen(
+                      doctorId: doctorId,
+                  ),
                 ),
                );           
               },
             ),
+              
+              // ------------------------------------------------
+              // Consultation History
+              // ------------------------------------------------
 
+               dashboardCard(
+               context: context,
+              icon: Icons.history,
+              title: 'Consultation History',
+               subtitle: 'View previously completed patient consultations.',
+               iconColor: Colors.teal,
+                onTap: () {
+                Navigator.push(
+                 context,
+                MaterialPageRoute(
+                builder: (context) => DoctorConsultationHistoryScreen(
+                  doctorId: doctorId,
+                    ),
+                 ),
+              );
+            },
+           ),
             // ------------------------------------------------
             // Patient Records
             // ------------------------------------------------
@@ -18533,7 +18930,12 @@ class profileItem extends StatelessWidget {
 // ============================================================
 
 class DoctorAppointmentsScreen extends StatefulWidget {
-  const DoctorAppointmentsScreen({super.key});
+  final int doctorId;
+
+  const DoctorAppointmentsScreen({
+    super.key,
+    required this.doctorId,
+  });
 
   @override
   State<DoctorAppointmentsScreen> createState() =>
@@ -18542,42 +18944,50 @@ class DoctorAppointmentsScreen extends StatefulWidget {
 
 class _DoctorAppointmentsScreenState
     extends State<DoctorAppointmentsScreen> {
+    @override
+     void initState() {
+     super.initState();
+       loadAppointments();
+    }
+Future<void> loadAppointments() async {
+  setState(() {
+    isLoading = true;
+    errorMessage = null;
+  });
 
-  // ----------------------------------------------------------
-  // DEMO APPOINTMENTS
-  // These represent the APPOINTMENTS entity from the ER diagram.
-  // Backend/database will replace this later.
-  // ----------------------------------------------------------
+  try {
+    final result =
+        await ApiService.getDoctorAppointments(widget.doctorId);
 
-  final List<Map<String, String>> appointments = [
-    {
-      'patientName': 'Anjali Kumar',
-      'date': '20/09/2026',
-      'startTime': '10:00 AM',
-      'endTime': '10:30 AM',
-      'mode': 'Online',
-      'status': 'Pending',
-      'reason': 'Fever and headache',
-    },
-    {
-      'patientName': 'Rahul Thomas',
-      'date': '20/09/2026',
-      'startTime': '11:00 AM',
-      'endTime': '11:30 AM',
-      'mode': 'Offline',
-      'status': 'Accepted',
-      'reason': 'General consultation',
-    },
-    {
-      'patientName': 'Meera Das',
-      'date': '21/09/2026',
-      'startTime': '02:00 PM',
-      'endTime': '02:30 PM',
-      'mode': 'Online',
-      'status': 'Pending',
-      'reason': 'Cough and cold',
-    },
-  ];
+    if (!mounted) return;
+
+    if (result['status'] == 'success') {
+      setState(() {
+        appointments =
+            List<Map<String, dynamic>>.from(
+          result['appointments'] ?? [],
+        );
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        errorMessage =
+            result['message'] ?? 'Failed to load appointments.';
+        isLoading = false;
+      });
+    }
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      errorMessage = 'Unable to load appointments.';
+      isLoading = false;
+    });
+  }
+}
+  List<Map<String, dynamic>> appointments = [];
+   bool isLoading = true;
+   String? errorMessage;
 
   // ----------------------------------------------------------
   // STATUS UPDATE
@@ -18602,8 +19012,7 @@ class _DoctorAppointmentsScreenState
   // ----------------------------------------------------------
   // APPOINTMENT DETAILS
   // ----------------------------------------------------------
-
-  void showAppointmentDetails(Map<String, dynamic> appointment) {
+void showAppointmentDetails(Map<String, dynamic> appointment) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -18614,18 +19023,12 @@ class _DoctorAppointmentsScreenState
     ),
     builder: (context) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          30,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               // Header
               Row(
                 children: [
@@ -18638,13 +19041,11 @@ class _DoctorAppointmentsScreenState
                       size: 30,
                     ),
                   ),
-
                   const SizedBox(width: 14),
-
                   Expanded(
                     child: Text(
-                      appointment['doctor']?.toString() ??
-                          'Doctor',
+                      appointment['patient_name']?.toString() ??
+                          'Unknown patient',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -18657,36 +19058,23 @@ class _DoctorAppointmentsScreenState
               const SizedBox(height: 20),
 
               appointmentDetailRow(
-                Icons.medical_services_outlined,
-                'Specialization',
-                appointment['specialty']?.toString() ??
+                Icons.badge_outlined,
+                'Patient ID',
+                appointment['patient_id']?.toString() ??
                     'Not available',
-              ),
-
-              appointmentDetailRow(
-                Icons.school_outlined,
-                'Qualification',
-                appointment['qualification']?.toString() ??
-                    'Not available',
-              ),
-
-              appointmentDetailRow(
-                Icons.work_outline,
-                'Experience',
-                '${appointment['experience_years'] ?? 0} years',
               ),
 
               appointmentDetailRow(
                 Icons.calendar_today,
                 'Appointment Date',
-                appointment['date']?.toString() ??
+                appointment['appointment_date']?.toString() ??
                     'Not available',
               ),
 
               appointmentDetailRow(
                 Icons.access_time,
                 'Start Time',
-                appointment['time']?.toString() ??
+                appointment['start_time']?.toString() ??
                     'Not available',
               ),
 
@@ -18730,10 +19118,7 @@ class _DoctorAppointmentsScreenState
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF3F6FA8),
                     foregroundColor: Colors.white,
-                    minimumSize: const Size(
-                      double.infinity,
-                      48,
-                    ),
+                    minimumSize: const Size(double.infinity, 48),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -18754,60 +19139,84 @@ class _DoctorAppointmentsScreenState
     },
   );
 }
-
-  // ----------------------------------------------------------
-  // APPOINTMENT DETAIL ROW
-  // ----------------------------------------------------------
-
-  Widget appointmentDetailRow(
-    IconData icon,
-    String title,
-    String value,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-
-          Icon(
-            icon,
-            size: 21,
-            color: const Color(0xFF3F6FA8),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
+Widget appointmentDetailRow(
+  IconData icon,
+  String title,
+  String value,
+) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          color: const Color(0xFF3F6FA8),
+          size: 21,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey,
                 ),
-
-                const SizedBox(height: 2),
-
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> completeAppointment(
+  Map<String, dynamic> appointment,
+) async {
+  final appointmentId =
+      appointment['appointment_id'] as int;
+
+  final result = await ApiService.completeDoctorAppointment(
+    doctorId: widget.doctorId,
+    appointmentId: appointmentId,
+  );
+
+  if (!mounted) return;
+
+  if (result['status'] == 'success') {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Appointment marked as completed.'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    await loadAppointments();
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['message'] ?? 'Failed to complete appointment.',
+        ),
+        backgroundColor: Colors.red,
       ),
     );
   }
+}
 
+  
   // ----------------------------------------------------------
   // APPOINTMENT CARD
   // ----------------------------------------------------------
@@ -18815,8 +19224,7 @@ class _DoctorAppointmentsScreenState
   Widget appointmentCard(int index) {
     final appointment = appointments[index];
 
-    final status = appointment['status']!;
-
+    final status = appointment['status']?.toString() ?? 'Unknown';
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16),
@@ -18852,7 +19260,7 @@ class _DoctorAppointmentsScreenState
                     children: [
 
                       Text(
-                        appointment['patientName']!,
+                        appointment['patient_name']?.toString() ?? 'Unknown patient',
                         style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
@@ -18862,7 +19270,8 @@ class _DoctorAppointmentsScreenState
                       const SizedBox(height: 4),
 
                       Text(
-                        appointment['reason']!,
+                        appointment['reason_for_visit']?.toString() ??
+                            'No reason provided',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.grey,
@@ -18877,27 +19286,30 @@ class _DoctorAppointmentsScreenState
                     horizontal: 10,
                     vertical: 6,
                   ),
-                  decoration: BoxDecoration(
-                    color: status == 'Accepted'
-                        ? Colors.green.withOpacity(0.12)
-                        : status == 'Declined'
-                            ? Colors.red.withOpacity(0.12)
-                            : Colors.orange.withOpacity(0.12),
-                    borderRadius:
-                        BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: status == 'Accepted'
-                          ? Colors.green
-                          : status == 'Declined'
-                              ? Colors.red
-                              : Colors.orange,
-                    ),
-                  ),
+                 decoration: BoxDecoration(
+  color: status == 'Scheduled'
+      ? Colors.blue.withOpacity(0.12)
+      : status == 'Completed'
+          ? Colors.green.withOpacity(0.12)
+          : status == 'Cancelled'
+              ? Colors.red.withOpacity(0.12)
+              : Colors.orange.withOpacity(0.12),
+  borderRadius: BorderRadius.circular(20),
+                          ),
+                           child: Text(
+                         status,
+                         style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        color: status == 'Scheduled'
+                       ? Colors.blue
+                       : status == 'Completed'
+                       ? Colors.green
+                       : status == 'Cancelled'
+                       ? Colors.red
+                     : Colors.orange,
+                   ),
+                  ), 
                 ),
               ],
             ),
@@ -18905,6 +19317,31 @@ class _DoctorAppointmentsScreenState
             const SizedBox(height: 16),
 
             const Divider(),
+
+if (status == 'Scheduled') ...[
+  const SizedBox(height: 12),
+
+  SizedBox(
+    width: double.infinity,
+    child: ElevatedButton.icon(
+      onPressed: () {
+        completeAppointment(appointment);
+      },
+      icon: const Icon(Icons.check_circle_outline),
+      label: const Text('Mark as Completed'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(double.infinity, 46),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    ),
+  ),
+],
+
+
 
             const SizedBox(height: 10),
 
@@ -18921,7 +19358,8 @@ class _DoctorAppointmentsScreenState
                 const SizedBox(width: 8),
 
                 Text(
-                  appointment['date']!,
+                 appointment['appointment_date']?.toString() ??
+                     'Date not available' ,
                   style: const TextStyle(
                     fontSize: 14,
                   ),
@@ -18939,7 +19377,8 @@ class _DoctorAppointmentsScreenState
 
                 Expanded(
                   child: Text(
-                    '${appointment['startTime']} - ${appointment['endTime']}',
+                    '${appointment['start_time'] ?? 'N/A'} - '
+                    '${appointment['end_time'] ?? 'N/A'}',
                     style: const TextStyle(
                       fontSize: 14,
                     ),
@@ -18955,7 +19394,7 @@ class _DoctorAppointmentsScreenState
               children: [
 
                 Icon(
-                  appointment['mode'] == 'Online'
+                  appointment['consultation_mode'] == 'Online'
                       ? Icons.video_call
                       : Icons.local_hospital,
                   size: 19,
@@ -18965,7 +19404,7 @@ class _DoctorAppointmentsScreenState
                 const SizedBox(width: 8),
 
                 Text(
-                  appointment['mode']!,
+                  appointment['consultation_mode']?.toString() ?? 'Not available',
                   style: const TextStyle(
                     fontSize: 14,
                   ),
@@ -19010,55 +19449,94 @@ class _DoctorAppointmentsScreenState
         foregroundColor: Colors.white,
       ),
 
-      body: appointments.isEmpty
-          ? const Center(
-              child: Text(
-                'No appointments available.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-              ),
-            )
-          : SingleChildScrollView(
+body: isLoading
+    ? const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF3F6FA8),
+        ),
+      )
+    : errorMessage != null
+        ? Center(
+            child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-
-                  const Text(
-                    'Appointments',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.red,
+                    size: 45,
                   ),
-
-                  const SizedBox(height: 6),
-
-                  const Text(
-                    'View and manage your patient appointments.',
-                    style: TextStyle(
-                      fontSize: 14,
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
                       color: Colors.grey,
                     ),
                   ),
-
-                  const SizedBox(height: 22),
-
-                  ...List.generate(
-                    appointments.length,
-                    (index) => appointmentCard(index),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: loadAppointments,
+                    child: const Text('Retry'),
                   ),
                 ],
               ),
             ),
+          )
+        : appointments.isEmpty
+            ? const Center(
+                child: Text(
+                  'No appointments available.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+              )
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Appointments',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    const Text(
+                      'View and manage your patient appointments.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                    const SizedBox(height: 22),
+
+                    ...List.generate(
+                      appointments.length,
+                      (index) => appointmentCard(index),
+                    ),
+                  ],
+                ),
+              ),
     );
   }
 }
 class DoctorConsultationsScreen extends StatefulWidget {
-  const DoctorConsultationsScreen({super.key});
+  final int doctorId;
+
+  const DoctorConsultationsScreen({
+    super.key,
+    required this.doctorId,
+  });
 
   @override
   State<DoctorConsultationsScreen> createState() =>
@@ -19067,39 +19545,59 @@ class DoctorConsultationsScreen extends StatefulWidget {
 
 class _DoctorConsultationsScreenState
     extends State<DoctorConsultationsScreen> {
-  final List<Map<String, String>> consultations = [
-    {
-      'patientName': 'Rahul Kumar',
-      'date': '20 September 2026',
-      'time': '10:00 AM - 10:30 AM',
-      'mode': 'Video Consultation',
-      'reason': 'Fever and headache',
-      'status': 'Upcoming',
-    },
-    {
-      'patientName': 'Anjali Sharma',
-      'date': '20 September 2026',
-      'time': '11:00 AM - 11:30 AM',
-      'mode': 'Video Consultation',
-      'reason': 'Cough and cold',
-      'status': 'Upcoming',
-    },
-    {
-      'patientName': 'Mohammed Ali',
-      'date': '21 September 2026',
-      'time': '02:00 PM - 02:30 PM',
-      'mode': 'Video Consultation',
-      'reason': 'Abdominal pain',
-      'status': 'Upcoming',
-    },
-  ];
+     List<Map<String, dynamic>> consultations = [];
 
-  void startConsultation(Map<String, String> consultation) {
+       bool isLoading = true;
+       String? errorMessage;
+       @override
+void initState() {
+  super.initState();
+  loadConsultations();
+}
+
+Future<void> loadConsultations() async {
+  try {
+    final result = await ApiService.getDoctorConsultations(
+      widget.doctorId,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      consultations = result.map((item) {
+        return {
+          'appointment_id': item['appointment_id'],
+          'patient_id': item['patient_id'],
+          'patientName': item['patient_name']?.toString() ?? 'Patient',
+          'date': item['appointment_date']?.toString() ?? '',
+          'time': '${item['start_time'] ?? ''} - ${item['end_time'] ?? ''}',
+          'mode': item['consultation_mode']?.toString() ?? '',
+          'reason': item['reason_for_visit']?.toString() ?? '',
+          'status': item['status']?.toString() ?? '',
+        };
+      }).toList();
+
+      isLoading = false;
+      errorMessage = null;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      isLoading = false;
+      errorMessage = e.toString();
+    });
+  }
+}
+    void startConsultation(Map<String, dynamic> consultation) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DoctorConsultationDetailsScreen(
-          consultation: consultation,
+       builder: (context) => DoctorConsultationDetailsScreen(
+         consultation: consultation,
+           appointmentId: int.parse(
+             consultation['appointment_id'].toString(),
+          ),
         ),
       ),
     );
@@ -19117,208 +19615,222 @@ class _DoctorConsultationsScreenState
         elevation: 0,
       ),
 
-      body: consultations.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.video_call_outlined,
-                    size: 60,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 14),
-                  Text(
-                    'No consultations available',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
+          body: isLoading
+    ? const Center(
+        child: CircularProgressIndicator(),
+      )
+    : errorMessage != null
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  errorMessage!,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: loadConsultations,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          )
+        : consultations.isEmpty
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.video_call_outlined,
+                      size: 60,
                       color: Colors.grey,
                     ),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: consultations.length,
-              itemBuilder: (context, index) {
-                final consultation = consultations[index];
+                    SizedBox(height: 14),
+                    Text(
+                      'No consultations available',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+           
+    : ListView.builder(
+    padding: const EdgeInsets.all(20),
+    itemCount: consultations.length,
+    itemBuilder: (context, index) {
+      final consultation = consultations[index];
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+      return Card(
+        margin: const EdgeInsets.only(bottom: 16),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 25,
+                    backgroundColor: Color(0xFFEAF2FA),
+                    child: Icon(
+                      Icons.person_outline,
+                      color: Color(0xFF3F6FA8),
+                      size: 28,
+                    ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            const CircleAvatar(
-                              radius: 25,
-                              backgroundColor: Color(0xFFEAF2FA),
-                              child: Icon(
-                                Icons.person_outline,
-                                color: Color(0xFF3F6FA8),
-                                size: 28,
-                              ),
-                            ),
-
-                            const SizedBox(width: 12),
-
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    consultation['patientName']!,
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF26384A),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    consultation['mode']!,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF3F6FA8),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                consultation['status']!,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.green,
-                                ),
-                              ),
-                            ),
-                          ],
+                        Text(
+                          consultation['patientName']?.toString() ?? 'Patient',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF26384A),
+                          ),
                         ),
-
-                        const SizedBox(height: 18),
-
-                        const Divider(),
-
-                        const SizedBox(height: 12),
-
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.calendar_today_outlined,
-                              size: 18,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              consultation['date']!,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF26384A),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.access_time_outlined,
-                              size: 18,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              consultation['time']!,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF26384A),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Icons.description_outlined,
-                              size: 18,
-                              color: Colors.grey,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                consultation['reason']!,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF26384A),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 18),
-
-                        SizedBox(
-                          width: double.infinity,
-                          height: 46,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              startConsultation(consultation);
-                            },
-                            icon: const Icon(
-                              Icons.video_call,
-                              size: 20,
-                            ),
-                            label: const Text(
-                              'Start Consultation',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  const Color(0xFF3F6FA8),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(12),
-                              ),
-                            ),
+                        const SizedBox(height: 4),
+                        Text(
+                          consultation['mode']?.toString() ?? '',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF3F6FA8),
                           ),
                         ),
                       ],
                     ),
                   ),
-                );
-              },
-            ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      consultation['status']?.toString() ?? 'Scheduled',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+              const Divider(),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    size: 18,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    consultation['date']?.toString() ?? '',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF26384A),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              Row(
+                children: [
+                  const Icon(
+                    Icons.access_time_outlined,
+                    size: 18,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    consultation['time']?.toString() ?? '',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF26384A),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.description_outlined,
+                    size: 18,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      consultation['reason']?.toString() ?? '',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF26384A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    startConsultation(consultation);
+                  },
+                  icon: const Icon(
+                    Icons.video_call,
+                    size: 20,
+                  ),
+                  label: const Text(
+                    'Start Consultation',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3F6FA8),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  ),
     );
   }
 }
@@ -19329,13 +19841,14 @@ class _DoctorConsultationsScreenState
 // ============================================================
 
 class DoctorConsultationDetailsScreen extends StatefulWidget {
-  final Map<String, String> consultation;
-
+     final Map<String, dynamic> consultation;
+     final int appointmentId;
   const DoctorConsultationDetailsScreen({
     super.key,
     required this.consultation,
+    required this.appointmentId,
   });
-
+     
   @override
   State<DoctorConsultationDetailsScreen> createState() =>
       _DoctorConsultationDetailsScreenState();
@@ -19381,31 +19894,50 @@ class _DoctorConsultationDetailsScreenState
     }
   }
 
-  void saveConsultation() {
-    if (chiefComplaintController.text.trim().isEmpty ||
-        notesController.text.trim().isEmpty ||
-        diagnosisController.text.trim().isEmpty ||
-        adviceController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please complete all consultation details.',
-          ),
-        ),
-      );
-      return;
-    }
-
+Future<void> saveConsultation() async {
+  if (chiefComplaintController.text.trim().isEmpty ||
+      notesController.text.trim().isEmpty ||
+      diagnosisController.text.trim().isEmpty ||
+      adviceController.text.trim().isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text(
-          'Consultation saved successfully.',
-        ),
+        content: Text('Please complete all consultation details.'),
       ),
     );
+    return;
+  }
 
+  final result = await ApiService.saveConsultation(
+    appointmentId: widget.appointmentId,
+    consultationType: widget.consultation['mode'] == 'Online'
+    ? 'Video'
+    : widget.consultation['mode'] == 'Offline'
+        ? 'In-Person'
+        : widget.consultation['mode']?.toString() ?? 'Video',
+    chiefComplaint: chiefComplaintController.text.trim(),
+    notes: notesController.text.trim(),
+    diagnosis: diagnosisController.text.trim(),
+    advice: adviceController.text.trim(),
+    followUpDate: followUpDate == null
+        ? null
+        : '${followUpDate!.year}-${followUpDate!.month.toString().padLeft(2, '0')}-${followUpDate!.day.toString().padLeft(2, '0')}',
+  );
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(result['message'] ?? 'Unknown response'),
+      backgroundColor: result['status'] == 'success'
+          ? Colors.green
+          : Colors.red,
+    ),
+  );
+
+  if (result['status'] == 'success') {
     Navigator.pop(context);
   }
+}
 
   Widget consultationField({
     required String label,
@@ -19661,6 +20193,295 @@ class _DoctorConsultationDetailsScreenState
           ],
         ),
       ),
+    );
+  }
+}
+
+class DoctorConsultationHistoryScreen extends StatefulWidget {
+  final int doctorId;
+
+  const DoctorConsultationHistoryScreen({
+    super.key,
+    required this.doctorId,
+  });
+
+  @override
+  State<DoctorConsultationHistoryScreen> createState() =>
+      _DoctorConsultationHistoryScreenState();
+}
+
+class _DoctorConsultationHistoryScreenState
+    extends State<DoctorConsultationHistoryScreen> {
+  List<Map<String, dynamic>> consultations = [];
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    loadConsultationHistory();
+  }
+
+  Future<void> loadConsultationHistory() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    final result =
+        await ApiService.getDoctorConsultationHistory(widget.doctorId);
+
+    if (!mounted) return;
+
+    if (result['status'] == 'success') {
+      final List<dynamic> data = result['consultations'] ?? [];
+
+      setState(() {
+        consultations = data
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        errorMessage =
+            result['message'] ?? 'Unable to load consultation history.';
+        isLoading = false;
+      });
+    }
+  }
+
+  String formatDate(dynamic value) {
+    if (value == null || value.toString().isEmpty) {
+      return 'Date unavailable';
+    }
+
+    try {
+      final date = DateTime.parse(value.toString());
+      return '${date.day.toString().padLeft(2, '0')}/'
+          '${date.month.toString().padLeft(2, '0')}/'
+          '${date.year}';
+    } catch (_) {
+      return value.toString();
+    }
+  }
+
+  Widget detailRow(String title, dynamic value) {
+    final text = value == null || value.toString().trim().isEmpty
+        ? 'Not provided'
+        : value.toString();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF263238),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget consultationCard(Map<String, dynamic> consultation) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 8,
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+        leading: const CircleAvatar(
+          radius: 25,
+          backgroundColor: Color(0xFFEAF2FA),
+          child: Icon(
+            Icons.person_outline,
+            color: Color(0xFF3F6FA8),
+            size: 28,
+          ),
+        ),
+        title: Text(
+          consultation['patient_name']?.toString() ?? 'Patient',
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 7),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${formatDate(consultation['appointment_date'])}  |  '
+                '${consultation['start_time'] ?? ''} - '
+                '${consultation['end_time'] ?? ''}',
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                consultation['consultation_type']?.toString() ??
+                    'Consultation',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF3F6FA8),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        trailing: const Icon(Icons.expand_more),
+        children: [
+          const Divider(),
+
+          detailRow(
+            'Chief Complaint',
+            consultation['chief_complaint'],
+          ),
+          detailRow(
+            'Diagnosis',
+            consultation['diagnosis'],
+          ),
+          detailRow(
+            'Consultation Notes',
+            consultation['notes'],
+          ),
+          detailRow(
+            'Advice',
+            consultation['advice'],
+          ),
+          detailRow(
+            'Follow-up Date',
+            consultation['follow_up_date'] == null
+                ? 'Not scheduled'
+                : formatDate(consultation['follow_up_date']),
+          ),
+          detailRow(
+            'Reason for Visit',
+            consultation['reason_for_visit'],
+          ),
+
+          const SizedBox(height: 12),
+
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 7,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Completed',
+              style: TextStyle(
+                color: Colors.green,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7FAFC),
+      appBar: AppBar(
+        title: const Text('Consultation History'),
+        backgroundColor: const Color(0xFF3F6FA8),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: loadConsultationHistory,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 55,
+                          color: Colors.red,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          errorMessage!,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: loadConsultationHistory,
+                          child: const Text('Try Again'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : consultations.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.history,
+                            size: 60,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(height: 14),
+                          Text(
+                            'No consultation history available',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(20),
+                      itemCount: consultations.length,
+                      itemBuilder: (context, index) {
+                        return consultationCard(consultations[index]);
+                      },
+                    ),
     );
   }
 }

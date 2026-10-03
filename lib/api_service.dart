@@ -332,4 +332,266 @@ static Future<Map<String, dynamic>> cancelAppointment({
     };
   }
 }
+static Future<Map<String, dynamic>> registerDoctor({
+  required String fullName,
+  required String phone,
+  required String registrationNumber,
+  required String qualification,
+  required int specializationId,
+  required int experienceYears,
+  int? hospitalId,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/doctors/register'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'full_name': fullName,
+        'phone': phone,
+        'registration_number': registrationNumber,
+        'qualification': qualification,
+        'specialization_id': specializationId,
+        'experience_years': experienceYears,
+        if (hospitalId != null) 'hospital_id': hospitalId,
+      }),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 201) {
+      return data;
+    }
+
+    return {
+      'status': 'error',
+      'message': data['message'] ?? 'Doctor registration failed',
+    };
+  } catch (e) {
+    return {
+      'status': 'error',
+      'message': 'Connection error: $e',
+    };
+  }
+}
+static Future<Map<String, dynamic>> checkDoctorPhone({
+  required String phone,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/doctors/login'),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'phone': phone,
+      }),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return data;
+    }
+
+    return {
+      'status': 'error',
+      'message': data['message'] ?? 'Doctor account not found',
+    };
+  } catch (e) {
+    return {
+      'status': 'error',
+      'message': 'Connection error: $e',
+    };
+  }
+}
+static Future<Map<String, dynamic>> getDoctorAppointments(
+  int doctorId,
+) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/doctors/$doctorId/appointments'),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return data;
+    }
+
+    return {
+      'status': 'error',
+      'message': data['message'] ?? 'Failed to load appointments',
+    };
+  } catch (e) {
+    return {
+      'status': 'error',
+      'message': 'Connection error: $e',
+    };
+  }
+}
+static Future<Map<String, dynamic>> completeDoctorAppointment({
+  required int doctorId,
+  required int appointmentId,
+}) async {
+  try {
+    final response = await http.put(
+      Uri.parse(
+        '$baseUrl/api/doctors/$doctorId/appointments/$appointmentId/complete',
+      ),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return data;
+    }
+
+    return {
+      'status': 'error',
+      'message': data['message'] ?? 'Failed to complete appointment.',
+    };
+  } catch (e) {
+    return {
+      'status': 'error',
+      'message': 'Connection error: $e',
+    };
+  }
+}
+
+static Future<Map<String, dynamic>> saveConsultation({
+  required int appointmentId,
+  required String consultationType,
+  required String chiefComplaint,
+  required String diagnosis,
+  required String notes,
+  required String advice,
+  String? followUpDate,
+}) async {
+  try {
+    final response = await http.post(
+      Uri.parse(
+        '$baseUrl/api/doctors/appointments/$appointmentId/consultation',
+      ),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        'consultation_type': consultationType,
+        'chief_complaint': chiefComplaint,
+        'diagnosis': diagnosis,
+        'notes': notes,
+        'advice': advice,
+        'follow_up_date': followUpDate,
+      }),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 201) {
+      return data;
+    }
+
+    return {
+      'status': 'error',
+      'message': data['message'] ?? 'Failed to save consultation.',
+    };
+  } catch (e) {
+    return {
+      'status': 'error',
+      'message': 'Connection error: $e',
+    };
+  }
+}
+static Future<List<Map<String, dynamic>>> getDoctorConsultations(
+  int doctorId,
+) async {
+  try {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/doctors/$doctorId/consultations'),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200 && data['status'] == 'success') {
+      return List<Map<String, dynamic>>.from(
+        data['consultations'],
+      );
+    }
+
+    throw Exception(data['message'] ?? 'Failed to load consultations.');
+  } catch (e) {
+    throw Exception('Unable to load consultations: $e');
+  }
+}
+
+static Future<Map<String, dynamic>> getDoctorConsultationHistory(
+  int doctorId,
+) async {
+  try {
+    final response = await http.get(
+      Uri.parse(
+        '$baseUrl/api/doctors/$doctorId/consultation-history',
+      ),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return data;
+    } else {
+      return {
+        'status': 'error',
+        'message': data['message'] ?? 'Failed to load consultation history',
+      };
+    }
+  } catch (e) {
+    return {
+      'status': 'error',
+      'message': e.toString(),
+    };
+  }
+}
+
+  // Generate Agora video call token
+  static Future<Map<String, dynamic>> getAgoraVideoToken({
+    required int appointmentId,
+    required int participantId,
+    required String participantRole,
+  }) async {
+    try {
+      final uri = Uri.parse(
+        '$baseUrl/api/appointments/$appointmentId/video-token',
+      ).replace(
+        queryParameters: {
+          'participant_id': participantId.toString(),
+          'participant_role': participantRole,
+        },
+      );
+
+      final response = await http.get(uri);
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 &&
+          data['status'] == 'success') {
+        return {
+          'success': true,
+          ...data,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ??
+            'Failed to generate Agora video token',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Connection error: $e',
+      };
+    }
+  }
 }

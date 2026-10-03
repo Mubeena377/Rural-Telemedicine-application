@@ -17,6 +17,9 @@ dependencies:
   geolocator: ^14.0.3
 
   flutter_map: ^7.0.2
+  jitsi_meet_flutter_sdk: ^13.2.0
+  agora_rtc_engine: ^6.6.4
+  permission_handler: ^13.0.2
 latlong2: ^0.9.1
   
 dev_dependencies:
