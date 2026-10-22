@@ -7,6 +7,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash
 import joblib
 import time
+import re
 from agora_token_builder import RtcTokenBuilder
 
 load_dotenv()
@@ -178,6 +179,67 @@ def register_patient():
             "status": "error",
             "message": str(e)
         }), 500
+
+@app.route("/api/patients/check-phone", methods=["GET"])
+def check_patient_phone():
+    phone = request.args.get("phone", "").strip()
+
+    if len(phone) != 10 or not phone.isdigit():
+        return jsonify({
+            "status": "error",
+            "message": "Please enter a valid 10-digit phone number."
+        }), 400
+
+    conn = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                u.user_id,
+                u.full_name,
+                p.patient_id
+            FROM users u
+            JOIN patients p ON p.user_id = u.user_id
+            WHERE u.phone = %s
+              AND u.role_id = 2
+            LIMIT 1
+        """, (phone,))
+
+        patient = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+        conn = None
+
+        if patient is None:
+            return jsonify({
+                "status": "error",
+                "message": "No patient account found with this phone number. Please register first."
+            }), 404
+
+        return jsonify({
+            "status": "success",
+            "message": "Patient account found",
+            "patient": {
+                "user_id": patient[0],
+                "full_name": patient[1],
+                "patient_id": patient[2]
+            }
+        }), 200
+
+    except Exception as e:
+        if conn is not None:
+            conn.close()
+
+        print("Patient phone check error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Unable to check patient account."
+        }), 500        
  # ============================================================
 # TRIAGE CLASSIFICATION
 # ============================================================
@@ -1580,7 +1642,7 @@ def get_doctor_consultation_history(doctor_id):
                if value is not None and hasattr(value, 'isoformat'):
                    consultation[key] = value.isoformat()
 
-        consultations.append(consultation)
+            consultations.append(consultation) 
 
         cursor.close()
         conn.close()
@@ -1707,12 +1769,1278 @@ def generate_video_token(appointment_id):
             "message": "Failed to generate video call token"
         }), 500
 
+  
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()   
+
+# ============================================================
+# SAVE PRESCRIPTION
+# ============================================================
+
+def parse_duration_days(text):
+    # Turns text like "3 days", "2 weeks" or "1 month" into a number of days
+    text = (text or "").lower()
+    match = re.search(r"\d+", text)
+
+    if not match:
+        return None
+
+    number = int(match.group())
+
+    if number <= 0:
+        return None
+
+    if "week" in text:
+        number = number * 7
+    elif "month" in text:
+        number = number * 30
+
+    return number
+
+
+@app.route("/api/prescriptions", methods=["POST"])
+def save_prescription():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "status": "error",
+            "message": "No data received"
+        }), 400
+
+    doctor_id = data.get("doctor_id")
+    consultation_id = data.get("consultation_id")
+    notes = data.get("notes")
+    medicines = data.get("medicines")
+
+    if not doctor_id or not consultation_id:
+        return jsonify({
+            "status": "error",
+            "message": "doctor_id and consultation_id are required"
+        }), 400
+
+    if not medicines or not isinstance(medicines, list):
+        return jsonify({
+            "status": "error",
+            "message": "Please add at least one medicine"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The consultation must belong to this doctor
+        cursor.execute("""
+            SELECT c.consultation_id
+            FROM consultations c
+            JOIN appointments a
+                ON c.appointment_id = a.appointment_id
+            WHERE c.consultation_id = %s
+              AND a.doctor_id = %s
+        """, (consultation_id, doctor_id))
+
+        if not cursor.fetchone():
+            return jsonify({
+                "status": "error",
+                "message": "Consultation not found for this doctor"
+            }), 404
+
+        # Category used for medicines that are not in the catalog yet
+        cursor.execute("""
+            SELECT category_id
+            FROM medicine_categories
+            WHERE category_name = 'General Medicine'
+        """)
+
+        category = cursor.fetchone()
+
+        if not category:
+            return jsonify({
+                "status": "error",
+                "message": "General Medicine category is missing"
+            }), 500
+
+        general_category_id = category[0]
+
+        # Create the prescription
+        cursor.execute("""
+            INSERT INTO prescriptions (consultation_id, notes)
+            VALUES (%s, %s)
+            RETURNING prescription_id
+        """, (
+            consultation_id,
+            notes if notes else None
+        ))
+
+        prescription_id = cursor.fetchone()[0]
+
+        used_medicine_ids = set()
+
+        for item in medicines:
+            name = (item.get("medicine") or "").strip()
+
+            if not name:
+                conn.rollback()
+                return jsonify({
+                    "status": "error",
+                    "message": "Medicine name is required"
+                }), 400
+
+            # Find the medicine in the catalog (ignore capital letters)
+            cursor.execute("""
+                SELECT medicine_id
+                FROM medicine_catalog
+                WHERE LOWER(medicine_name) = LOWER(%s)
+                LIMIT 1
+            """, (name,))
+
+            row = cursor.fetchone()
+
+            if row:
+                medicine_id = row[0]
+            else:
+                cursor.execute("""
+                    INSERT INTO medicine_catalog
+                        (category_id, medicine_name)
+                    VALUES (%s, %s)
+                    RETURNING medicine_id
+                """, (general_category_id, name))
+
+                medicine_id = cursor.fetchone()[0]
+
+            if medicine_id in used_medicine_ids:
+                conn.rollback()
+                return jsonify({
+                    "status": "error",
+                    "message": "The same medicine was added twice"
+                }), 400
+
+            used_medicine_ids.add(medicine_id)
+
+            cursor.execute("""
+                INSERT INTO prescription_medicines
+                (
+                    prescription_id,
+                    medicine_id,
+                    dose,
+                    frequency,
+                    duration_days,
+                    instructions
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                prescription_id,
+                medicine_id,
+                item.get("dosage"),
+                item.get("frequency"),
+                parse_duration_days(item.get("duration")),
+                item.get("instructions") or None
+            ))
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Prescription saved successfully",
+            "prescription_id": prescription_id
+        }), 201
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Save Prescription Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save prescription"
+        }), 500
+
     finally:
         if cursor:
             cursor.close()
 
         if conn:
             conn.close()     
+
+# ============================================================
+# GET A PATIENT'S PRESCRIPTIONS
+# ============================================================
+
+@app.route("/api/patients/<int:patient_id>/prescriptions", methods=["GET"])
+def get_patient_prescriptions(patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                p.prescription_id,
+                p.prescription_date,
+                p.notes,
+                c.diagnosis,
+                u.full_name AS doctor_name,
+                s.spec_name,
+                m.medicine_name,
+                pm.dose,
+                pm.frequency,
+                pm.duration_days,
+                pm.instructions,
+                (CURRENT_DATE - p.prescription_date) > 7 AS expired,
+                pu.full_name AS patient_name,
+                d.signature_image AS doctor_signature
+            FROM prescriptions p  
+            JOIN consultations c
+                ON p.consultation_id = c.consultation_id
+            JOIN appointments a
+                ON c.appointment_id = a.appointment_id
+            JOIN doctors d
+                ON a.doctor_id = d.doctor_id
+            JOIN users u
+                ON d.user_id = u.user_id
+            JOIN specializations s
+                ON d.specialization_id = s.spec_id
+            JOIN patients pt
+                ON a.patient_id = pt.patient_id
+            JOIN users pu
+                ON pt.user_id = pu.user_id
+            LEFT JOIN prescription_medicines pm
+                ON pm.prescription_id = p.prescription_id
+            LEFT JOIN medicine_catalog m
+                ON pm.medicine_id = m.medicine_id
+            WHERE a.patient_id = %s
+            ORDER BY p.created_at DESC, p.prescription_id DESC, pm.id ASC
+        """, (patient_id,))
+
+        rows = cursor.fetchall()
+
+        prescriptions = {}
+
+        for row in rows:
+            prescription_id = row[0]
+
+            if prescription_id not in prescriptions:
+                prescriptions[prescription_id] = {
+                    "prescription_id": prescription_id,
+                    "prescription_date": str(row[1]),
+                    "notes": row[2],
+                    "diagnosis": row[3],
+                    "doctor_name": row[4],
+                    "specialization": row[5],
+                    "expired": row[11],  # True if older than 7 days
+                    "patient_name": row[12],  # Shown on the PDF
+                    "doctor_signature": row[13],  # Shown on the PDF          # Shown on the PDF# True if older than 7 days
+                    "medicines": []
+                }
+
+            if row[6] is not None:
+                prescriptions[prescription_id]["medicines"].append({
+                    "medicine": row[6],
+                    "dosage": row[7],
+                    "frequency": row[8],
+                    "duration_days": row[9],
+                    "instructions": row[10]
+                })
+
+        return jsonify({
+            "status": "success",
+            "prescriptions": list(prescriptions.values())
+        }), 200
+
+    except Exception as e:
+        print("Get Patient Prescriptions Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load prescriptions"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()   
+
+ # ============================================================
+# GET A DOCTOR'S PRESCRIPTIONS
+# Returns every prescription written by one doctor.
+# ============================================================
+
+@app.route("/api/doctors/<int:doctor_id>/prescriptions", methods=["GET"])
+def get_doctor_prescriptions(doctor_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # One row is returned per medicine, so a prescription with
+        # 3 medicines comes back as 3 rows. We group them below.
+        cursor.execute("""
+            SELECT
+                p.prescription_id,
+                p.prescription_date,
+                p.notes,
+                c.diagnosis,
+                pu.full_name AS patient_name,
+                m.medicine_name,
+                pm.dose,
+                pm.frequency,
+                pm.duration_days,
+                pm.instructions,
+                du.full_name AS doctor_name,
+                s.spec_name AS specialization,
+                d.signature_image AS doctor_signature
+            FROM prescriptions p
+            JOIN consultations c
+                ON p.consultation_id = c.consultation_id
+            JOIN appointments a
+                ON c.appointment_id = a.appointment_id
+            JOIN patients pt
+                ON a.patient_id = pt.patient_id
+            JOIN users pu
+                ON pt.user_id = pu.user_id
+            JOIN doctors d
+                ON a.doctor_id = d.doctor_id
+            JOIN users du
+                ON d.user_id = du.user_id
+            JOIN specializations s
+                ON d.specialization_id = s.spec_id
+            LEFT JOIN prescription_medicines pm
+                ON pm.prescription_id = p.prescription_id
+            LEFT JOIN medicine_catalog m
+                ON pm.medicine_id = m.medicine_id
+            WHERE a.doctor_id = %s
+            ORDER BY p.created_at DESC, p.prescription_id DESC, pm.id ASC
+        """, (doctor_id,))
+
+        rows = cursor.fetchall()
+
+        # Group the rows so each prescription appears only once
+        prescriptions = {}
+
+        for row in rows:
+            prescription_id = row[0]
+
+            # First time we see this prescription: create its entry
+            if prescription_id not in prescriptions:
+                prescriptions[prescription_id] = {
+                    "prescription_id": prescription_id,
+                    "prescription_date": str(row[1]),
+                    "notes": row[2],
+                    "diagnosis": row[3],
+                    "patient_name": row[4],
+                    "doctor_name": row[10],  # Shown on the PDF
+                    "specialization": row[11],  # Shown on the PDF
+                    "doctor_signature": row[12],  # Shown on the PDF # Shown on the PDF
+                    "medicines": []
+                }
+
+            # Add this row's medicine (if the prescription has one)
+            if row[5] is not None:
+                prescriptions[prescription_id]["medicines"].append({
+                    "medicine": row[5],
+                    "dosage": row[6],
+                    "frequency": row[7],
+                    "duration_days": row[8],
+                    "instructions": row[9]
+                })
+
+        return jsonify({
+            "status": "success",
+            "prescriptions": list(prescriptions.values())
+        }), 200
+
+    except Exception as e:
+        print("Get Doctor Prescriptions Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load prescriptions"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()  
+            
+# ============================================================
+# PLACE A MEDICINE ORDER FROM A PRESCRIPTION
+# Creates an order with 1 pack of every medicine on the prescription.
+# ============================================================
+
+@app.route("/api/medicine-orders", methods=["POST"])
+def place_medicine_order():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "status": "error",
+            "message": "No data received"
+        }), 400
+
+    patient_id = data.get("patient_id")
+    prescription_id = data.get("prescription_id")
+    delivery_address = (data.get("delivery_address") or "").strip()
+    payment_method = data.get("payment_method")
+
+    # Check the required details
+    if not patient_id or not prescription_id:
+        return jsonify({
+            "status": "error",
+            "message": "patient_id and prescription_id are required"
+        }), 400
+
+    if not delivery_address:
+        return jsonify({
+            "status": "error",
+            "message": "Please enter a delivery address"
+        }), 400
+
+    # Only the payment methods that exist in the payment_methods table
+    if payment_method not in ["COD", "Card", "UPI", "Wallet"]:
+        return jsonify({
+            "status": "error",
+            "message": "Please choose a valid payment method"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The prescription must belong to this patient
+        cursor.execute("""
+            SELECT p.prescription_id
+            FROM prescriptions p
+            JOIN consultations c
+                ON p.consultation_id = c.consultation_id
+            JOIN appointments a
+                ON c.appointment_id = a.appointment_id
+            WHERE p.prescription_id = %s
+              AND a.patient_id = %s
+        """, (prescription_id, patient_id))
+
+        if not cursor.fetchone():
+            return jsonify({
+                "status": "error",
+                "message": "Prescription not found for this patient"
+            }), 404
+
+                # Prescriptions older than 7 days cannot be used to order.
+        # (CURRENT_DATE - prescription_date) is the age in days.
+        cursor.execute("""
+            SELECT (CURRENT_DATE - prescription_date) > 7
+            FROM prescriptions
+            WHERE prescription_id = %s
+        """, (prescription_id,))
+
+        is_expired = cursor.fetchone()[0]
+
+        if is_expired:
+            return jsonify({
+                "status": "error",
+                "message": "This prescription is more than 7 days old. Please consult the doctor again for a new prescription."
+            }), 400
+
+        # Get every medicine on the prescription, with its price
+        cursor.execute("""
+            SELECT
+                pm.medicine_id,
+                mc.unit_price
+            FROM prescription_medicines pm
+            JOIN medicine_catalog mc
+                ON pm.medicine_id = mc.medicine_id
+            WHERE pm.prescription_id = %s
+        """, (prescription_id,))
+
+        items = cursor.fetchall()
+
+        if not items:
+            return jsonify({
+                "status": "error",
+                "message": "This prescription has no medicines to order"
+            }), 400
+
+        # First version: 1 pack of each medicine
+        quantity = 1
+
+        # Add up the price of all medicines
+        total_amount = sum(float(item[1]) * quantity for item in items)
+
+        # Create the order
+        cursor.execute("""
+            INSERT INTO medicine_orders
+                (patient_id, total_amount, status,
+                 delivery_address, payment_method)
+            VALUES (%s, %s, 'Placed', %s, %s)
+            RETURNING order_id
+        """, (
+            patient_id,
+            total_amount,
+            delivery_address,
+            payment_method
+        ))
+
+        order_id = cursor.fetchone()[0]
+
+        # Add one row to the order for each medicine
+        for item in items:
+            medicine_id = item[0]
+            unit_price = float(item[1])
+
+            cursor.execute("""
+                INSERT INTO medicine_order_items
+                    (order_id, medicine_id, quantity,
+                     unit_price, total_price)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                order_id,
+                medicine_id,
+                quantity,
+                unit_price,
+                unit_price * quantity
+            ))
+
+        # Save the order and its items together
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Order placed successfully",
+            "order_id": order_id,
+            "total_amount": total_amount
+        }), 201
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Place Medicine Order Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to place the order"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()  
+
+# ============================================================
+# GET A PATIENT'S MEDICINE ORDERS
+# Used for "Your Orders" and "Track Your Order" in the app.
+# ============================================================
+
+@app.route("/api/patients/<int:patient_id>/medicine-orders", methods=["GET"])
+def get_patient_medicine_orders(patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # One row is returned per medicine in an order, so an order
+        # with 3 medicines comes back as 3 rows. We group them below.
+        cursor.execute("""
+            SELECT
+                o.order_id,
+                o.order_date,
+                o.total_amount,
+                o.status,
+                o.delivery_address,
+                o.payment_method,
+                mc.medicine_name,
+                oi.quantity,
+                oi.unit_price,
+                oi.total_price
+            FROM medicine_orders o
+            LEFT JOIN medicine_order_items oi
+                ON oi.order_id = o.order_id
+            LEFT JOIN medicine_catalog mc
+                ON oi.medicine_id = mc.medicine_id
+            WHERE o.patient_id = %s
+            ORDER BY o.order_date DESC, o.order_id DESC, oi.id ASC
+        """, (patient_id,))
+
+        rows = cursor.fetchall()
+
+        # Group the rows so each order appears only once
+        orders = {}
+
+        for row in rows:
+            order_id = row[0]
+
+            # First time we see this order: create its entry
+            if order_id not in orders:
+                orders[order_id] = {
+                    "order_id": order_id,
+                    "order_date": str(row[1]),
+                    "total_amount": float(row[2]),
+                    "status": row[3],
+                    "delivery_address": row[4],
+                    "payment_method": row[5],
+                    "items": []
+                }
+
+            # Add this row's medicine (if the order has one)
+            if row[6] is not None:
+                orders[order_id]["items"].append({
+                    "medicine": row[6],
+                    "quantity": row[7],
+                    "unit_price": float(row[8]),
+                    "total_price": float(row[9])
+                })
+
+        return jsonify({
+            "status": "success",
+            "orders": list(orders.values())
+        }), 200
+
+    except Exception as e:
+        print("Get Medicine Orders Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load orders"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+# ============================================================
+# DOCTOR SIGNATURE
+# The signature is a small PNG picture, sent by the app as text
+# (base64) and stored in the doctors table.
+# ============================================================
+
+# Read the saved signature of a doctor
+@app.route("/api/doctors/<int:doctor_id>/signature", methods=["GET"])
+def get_doctor_signature(doctor_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT signature_image
+            FROM doctors
+            WHERE doctor_id = %s
+        """, (doctor_id,))
+
+        row = cursor.fetchone()
+
+        # No doctor with this ID
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Doctor not found"
+            }), 404
+
+        # row[0] is empty (null) if the doctor has not drawn one yet
+        return jsonify({
+            "status": "success",
+            "signature": row[0]
+        }), 200
+
+    except Exception as e:
+        print("Get Signature Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load signature"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# Save (or replace) the signature of a doctor
+@app.route("/api/doctors/<int:doctor_id>/signature", methods=["PUT"])
+def save_doctor_signature(doctor_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "status": "error",
+            "message": "No data received"
+        }), 400
+
+    signature = data.get("signature")
+
+    # The signature must be a non-empty piece of text
+    if not signature or not isinstance(signature, str):
+        return jsonify({
+            "status": "error",
+            "message": "Signature is required"
+        }), 400
+
+    # Reject very large pictures (about 500 KB of text is plenty)
+    if len(signature) > 500000:
+        return jsonify({
+            "status": "error",
+            "message": "Signature image is too large"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE doctors
+            SET signature_image = %s
+            WHERE doctor_id = %s
+            RETURNING doctor_id
+        """, (signature, doctor_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "Doctor not found"
+            }), 404
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Signature saved successfully"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Save Signature Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save signature"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# GET A PATIENT'S HEALTH RECORD
+# Returns the patient's consultation history and their saved
+# records (allergies, conditions, immunizations, surgeries).
+# ============================================================
+
+@app.route("/api/patients/<int:patient_id>/health-record", methods=["GET"])
+def get_patient_health_record(patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # ----- Past consultations, newest first -----
+        cursor.execute("""
+            SELECT
+                c.consultation_id,
+                a.appointment_date,
+                c.consultation_type,
+                c.chief_complaint,
+                c.diagnosis,
+                c.notes,
+                c.advice,
+                c.follow_up_date,
+                u.full_name AS doctor_name,
+                s.spec_name AS specialization
+            FROM consultations c
+            JOIN appointments a
+                ON c.appointment_id = a.appointment_id
+            JOIN doctors d
+                ON a.doctor_id = d.doctor_id
+            JOIN users u
+                ON d.user_id = u.user_id
+            JOIN specializations s
+                ON d.specialization_id = s.spec_id
+            WHERE a.patient_id = %s
+            ORDER BY a.appointment_date DESC, c.consultation_id DESC
+        """, (patient_id,))
+
+        consultations = []
+
+        for row in cursor.fetchall():
+            consultations.append({
+                "consultation_id": row[0],
+                "appointment_date": str(row[1]),
+                "consultation_type": row[2],
+                "chief_complaint": row[3],
+                "diagnosis": row[4],
+                "notes": row[5],
+                "advice": row[6],
+                # follow_up_date can be empty, so only convert if it exists
+                "follow_up_date": str(row[7]) if row[7] else None,
+                "doctor_name": row[8],
+                "specialization": row[9]
+            })
+
+        # ----- The patient's own records, newest first -----
+        cursor.execute("""
+            SELECT
+                record_id,
+                record_type,
+                description,
+                record_date
+            FROM medical_records
+            WHERE patient_id = %s
+            ORDER BY created_at DESC, record_id DESC
+        """, (patient_id,))
+
+        records = []
+
+        for row in cursor.fetchall():
+            records.append({
+                "record_id": row[0],
+                "record_type": row[1],
+                "description": row[2],
+                "record_date": str(row[3]) if row[3] else None
+            })
+
+        return jsonify({
+            "status": "success",
+            "consultations": consultations,
+            "records": records
+        }), 200
+
+    except Exception as e:
+        print("Get Health Record Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load health record"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# ADD A MEDICAL RECORD
+# The patient adds an allergy, condition, immunization, etc.
+# ============================================================
+
+@app.route("/api/patients/<int:patient_id>/medical-records", methods=["POST"])
+def add_medical_record(patient_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "status": "error",
+            "message": "No data received"
+        }), 400
+
+    record_type = data.get("record_type")
+    description = (data.get("description") or "").strip()
+    record_date = data.get("record_date")  # Optional, like 2026-10-22
+
+    # Only the types allowed by the database
+    allowed_types = [
+        "Allergy",
+        "Condition",
+        "Immunization",
+        "Surgery",
+        "Other"
+    ]
+
+    if record_type not in allowed_types:
+        return jsonify({
+            "status": "error",
+            "message": "Please choose a valid record type"
+        }), 400
+
+    if not description:
+        return jsonify({
+            "status": "error",
+            "message": "Please enter a description"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The patient must exist
+        cursor.execute(
+            "SELECT patient_id FROM patients WHERE patient_id = %s",
+            (patient_id,)
+        )
+
+        if not cursor.fetchone():
+            return jsonify({
+                "status": "error",
+                "message": "Patient not found"
+            }), 404
+
+        cursor.execute("""
+            INSERT INTO medical_records
+                (patient_id, record_type, description, record_date)
+            VALUES (%s, %s, %s, %s)
+            RETURNING record_id
+        """, (
+            patient_id,
+            record_type,
+            description,
+            record_date if record_date else None
+        ))
+
+        record_id = cursor.fetchone()[0]
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Record added successfully",
+            "record_id": record_id
+        }), 201
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Add Medical Record Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to add the record"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ============================================================
+# DELETE A MEDICAL RECORD
+# Removes one record, but only if it belongs to this patient.
+# ============================================================
+
+@app.route(
+    "/api/patients/<int:patient_id>/medical-records/<int:record_id>",
+    methods=["DELETE"]
+)
+def delete_medical_record(patient_id, record_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            DELETE FROM medical_records
+            WHERE record_id = %s
+              AND patient_id = %s
+            RETURNING record_id
+        """, (record_id, patient_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "Record not found"
+            }), 404
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Record deleted"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Delete Medical Record Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to delete the record"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+# ============================================================
+# GET A DOCTOR'S PATIENTS
+# Lists the patients who have (or had) an appointment with
+# this doctor. Cancelled appointments do not count.
+# ============================================================
+
+@app.route("/api/doctors/<int:doctor_id>/patients", methods=["GET"])
+def get_doctor_patients(doctor_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # One row per patient. MAX() picks the newest appointment date.
+        # The age is worked out from the date of birth (empty if unknown).
+        cursor.execute("""
+            SELECT
+                pt.patient_id,
+                u.full_name,
+                u.phone,
+                pt.gender,
+                CASE
+                    WHEN pt.date_of_birth IS NULL THEN NULL
+                    ELSE DATE_PART('year', AGE(pt.date_of_birth))::int
+                END AS age,
+                MAX(a.appointment_date) AS last_visit
+            FROM appointments a
+            JOIN patients pt
+                ON a.patient_id = pt.patient_id
+            JOIN users u
+                ON pt.user_id = u.user_id
+            WHERE a.doctor_id = %s
+              AND a.status <> 'Cancelled'
+            GROUP BY
+                pt.patient_id,
+                u.full_name,
+                u.phone,
+                pt.gender,
+                pt.date_of_birth
+            ORDER BY MAX(a.appointment_date) DESC
+        """, (doctor_id,))
+
+        patients = []
+
+        for row in cursor.fetchall():
+            patients.append({
+                "patient_id": row[0],
+                "full_name": row[1],
+                "phone": row[2],
+                "gender": row[3],
+                "age": row[4],
+                "last_visit": str(row[5]) if row[5] else None
+            })
+
+        return jsonify({
+            "status": "success",
+            "patients": patients
+        }), 200
+
+    except Exception as e:
+        print("Get Doctor Patients Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load patients"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+# ============================================================
+# GET ONE PATIENT'S RECORD (FOR A DOCTOR)
+# The doctor can only open patients they have an appointment with.
+# ============================================================
+
+@app.route(
+    "/api/doctors/<int:doctor_id>/patients/<int:patient_id>/record",
+    methods=["GET"]
+)
+def get_patient_record_for_doctor(doctor_id, patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # ----- Access check: does this doctor have an appointment
+        # with this patient? If not, refuse. -----
+        cursor.execute("""
+            SELECT 1
+            FROM appointments
+            WHERE doctor_id = %s
+              AND patient_id = %s
+              AND status <> 'Cancelled'
+            LIMIT 1
+        """, (doctor_id, patient_id))
+
+        if not cursor.fetchone():
+            return jsonify({
+                "status": "error",
+                "message": "You do not have access to this patient's record"
+            }), 403
+
+        # ----- The patient's profile -----
+        cursor.execute("""
+            SELECT
+                u.full_name,
+                u.phone,
+                pt.gender,
+                CASE
+                    WHEN pt.date_of_birth IS NULL THEN NULL
+                    ELSE DATE_PART('year', AGE(pt.date_of_birth))::int
+                END AS age,
+                pt.blood_group,
+                pt.address,
+                pt.emergency_contact_name,
+                pt.emergency_contact_phone
+            FROM patients pt
+            JOIN users u
+                ON pt.user_id = u.user_id
+            WHERE pt.patient_id = %s
+        """, (patient_id,))
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Patient not found"
+            }), 404
+
+        patient = {
+            "patient_id": patient_id,
+            "full_name": row[0],
+            "phone": row[1],
+            "gender": row[2],
+            "age": row[3],
+            "blood_group": row[4],
+            "address": row[5],
+            "emergency_contact_name": row[6],
+            "emergency_contact_phone": row[7]
+        }
+
+        # ----- Consultations carried out by THIS doctor -----
+        # (To show every doctor's consultations, delete the line
+        #  "AND a.doctor_id = %s" and the doctor_id after patient_id below.)
+        cursor.execute("""
+            SELECT
+                c.consultation_id,
+                a.appointment_date,
+                c.consultation_type,
+                c.chief_complaint,
+                c.diagnosis,
+                c.notes,
+                c.advice,
+                c.follow_up_date
+            FROM consultations c
+            JOIN appointments a
+                ON c.appointment_id = a.appointment_id
+            WHERE a.patient_id = %s
+              AND a.doctor_id = %s
+            ORDER BY a.appointment_date DESC, c.consultation_id DESC
+        """, (patient_id, doctor_id))
+
+        consultations = []
+
+        for r in cursor.fetchall():
+            consultations.append({
+                "consultation_id": r[0],
+                "appointment_date": str(r[1]),
+                "consultation_type": r[2],
+                "chief_complaint": r[3],
+                "diagnosis": r[4],
+                "notes": r[5],
+                "advice": r[6],
+                "follow_up_date": str(r[7]) if r[7] else None
+            })
+
+        # ----- The patient's own records (allergies, conditions...) -----
+        cursor.execute("""
+            SELECT
+                record_id,
+                record_type,
+                description,
+                record_date
+            FROM medical_records
+            WHERE patient_id = %s
+            ORDER BY created_at DESC, record_id DESC
+        """, (patient_id,))
+
+        records = []
+
+        for r in cursor.fetchall():
+            records.append({
+                "record_id": r[0],
+                "record_type": r[1],
+                "description": r[2],
+                "record_date": str(r[3]) if r[3] else None
+            })
+
+        return jsonify({
+            "status": "success",
+            "patient": patient,
+            "consultations": consultations,
+            "records": records
+        }), 200
+
+    except Exception as e:
+        print("Get Patient Record For Doctor Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the patient record"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+            
 if __name__ == "__main__":
 
         app.run(

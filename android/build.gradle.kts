@@ -1,3 +1,5 @@
+extra["compileSdkVersion"] = 37
+
 allprojects {
     repositories {
         google()

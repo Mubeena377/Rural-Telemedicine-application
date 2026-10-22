@@ -20,6 +20,9 @@ dependencies:
   jitsi_meet_flutter_sdk: ^13.2.0
   agora_rtc_engine: ^6.6.4
   permission_handler: ^13.0.2
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  image: 4.5.4
 latlong2: ^0.9.1
   
 dev_dependencies:

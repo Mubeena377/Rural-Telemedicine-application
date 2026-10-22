@@ -8,6 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'api_service.dart';
+import 'video_call_screen.dart';
+import 'doctor_create_prescription_screen.dart';
+import 'patient_prescriptions_screen.dart';
+import 'order_medicine_home_screen.dart';
+import 'prescription_pdf.dart';
+import 'doctor_session.dart';
+import 'patient_health_record_screen.dart';
 
 final ValueNotifier<String> ambulanceStatus =
     ValueNotifier<String>('Available');
@@ -2910,7 +2917,35 @@ void initState() {
   Future.delayed(const Duration(seconds: 3), () async {
     if (!mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
+       final prefs = await SharedPreferences.getInstance();
+
+    // First, check whether a doctor is saved on this phone
+    // (saved when the doctor logged in or registered)
+    final savedDoctor = await DoctorSession.load();
+
+    // The screen may have been closed while we were checking
+    if (!mounted) return;
+
+    // A doctor is saved: open the dashboard directly
+    if (savedDoctor != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DoctorDashboardScreen(
+            doctorId: savedDoctor['doctorId'] as int,
+            doctorName: savedDoctor['doctorName'] as String,
+            doctorSpecialization:
+                savedDoctor['doctorSpecialization'] as String,
+            doctorQualification:
+                savedDoctor['doctorQualification'] as String,
+            doctorExperience: savedDoctor['doctorExperience'] as int,
+            doctorAvailability:
+                savedDoctor['doctorAvailability'] as String,
+          ),
+        ),
+      );
+      return; // Stop here, the code below is for patients
+    }
 
     final isRegistered =
         prefs.getBool('isRegistered') ?? false;
@@ -4160,9 +4195,44 @@ Future<void> registerPatient() async {
                   ),
                 ),
               ),
+               
+              const SizedBox(height: 12),
 
-              const SizedBox(height: 20),
-            ],
+                  // ALREADY REGISTERED? PATIENT LOGIN
+                   SizedBox(
+  width: double.infinity,
+  height: 52,
+  child: OutlinedButton.icon(
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const PatientLoginScreen(),
+        ),
+      );
+    },
+    icon: const Icon(Icons.login),
+    label: const Text(
+      'Already Registered? Patient Login',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+    style: OutlinedButton.styleFrom(
+      foregroundColor: Colors.green,
+      side: const BorderSide(color: Colors.green),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+    ),
+  ),
+),
+
+                    const SizedBox(height: 20),
+                 const SizedBox(height: 20),
+             ],
           ),
         ),
       ),
@@ -4175,52 +4245,27 @@ Future<void> registerPatient() async {
 // REGISTRATION SUCCESS SCREEN
 // ======================================================
 
-class RegistrationSuccessScreen
-    extends StatelessWidget {
-
-  const RegistrationSuccessScreen({
-    super.key,
-  });
-
-  get l => null;
+class RegistrationSuccessScreen extends StatelessWidget {
+  const RegistrationSuccessScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
       backgroundColor: Colors.white,
-
       body: SafeArea(
-
         child: Center(
-
           child: Padding(
-
-            padding:
-                const EdgeInsets.all(30),
-
+            padding: const EdgeInsets.all(30),
             child: Column(
-
-              mainAxisAlignment:
-                  MainAxisAlignment.center,
-
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-
                 Container(
-
                   width: 100,
                   height: 100,
-
-                  decoration:
-                      BoxDecoration(
-                    color:
-                        Colors.green.shade100,
-
-                    shape:
-                        BoxShape.circle,
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade100,
+                    shape: BoxShape.circle,
                   ),
-
                   child: const Icon(
                     Icons.check,
                     size: 65,
@@ -4231,14 +4276,14 @@ class RegistrationSuccessScreen
                 const SizedBox(height: 25),
 
                 Text(
-                  tr('Registration Successful!', selectedLanguage),
-                  textAlign:
-                      TextAlign.center,
-
-                  style: TextStyle(
+                  tr(
+                    'Registration Successful!',
+                    selectedLanguage,
+                  ),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
                     fontSize: 26,
-                    fontWeight:
-                        FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                     color: Colors.green,
                   ),
                 ),
@@ -4246,62 +4291,85 @@ class RegistrationSuccessScreen
                 const SizedBox(height: 12),
 
                 Text(
-                  tr('Your profile has been created successfully.', selectedLanguage),
-                  textAlign:
-                      TextAlign.center,
-
+                  tr(
+                    'Your profile has been created successfully.',
+                    selectedLanguage,
+                  ),
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color:
-                        Colors.grey.shade600,
+                    color: Colors.grey.shade600,
                   ),
                 ),
 
                 const SizedBox(height: 35),
 
+                // Existing Continue button
                 SizedBox(
-
                   width: double.infinity,
                   height: 55,
-
                   child: ElevatedButton(
-
                     onPressed: () {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                           builder: (context) => HomeScreen(),
-                    ),
-                  );
-
-                },
-
-                    style:
-                        ElevatedButton.styleFrom(
-
-                      backgroundColor:
-                          Colors.green,
-
-                      foregroundColor:
-                          Colors.white,
-
-                      shape:
-                          RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(14),
+                          builder: (context) => HomeScreen(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-
                     child: Text(
                       tr('CONTINUE', selectedLanguage),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 17,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                )
+                ),
+
+                const SizedBox(height: 16),
+
+                // Patient Login button
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const PatientLoginScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.login),
+                    label: const Text(
+                      'Already Registered? Patient Login',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.green,
+                      side: const BorderSide(
+                        color: Colors.green,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -4309,7 +4377,304 @@ class RegistrationSuccessScreen
       ),
     );
   }
+}
+
+class PatientLoginScreen extends StatefulWidget {
+  const PatientLoginScreen({super.key});
+
+  @override
+  State<PatientLoginScreen> createState() =>
+      _PatientLoginScreenState();
+}
+
+class _PatientLoginScreenState extends State<PatientLoginScreen> {
+  final TextEditingController phoneController =
+      TextEditingController();
+  final TextEditingController otpController =
+      TextEditingController();
+
+  bool otpSent = false;
+  bool otpVerified = false;
+  bool isLoading = false;
+
+  int? patientId;
+  String? patientName;
+
+  @override
+  void dispose() {
+    phoneController.dispose();
+    otpController.dispose();
+    super.dispose();
+  }
+
+  Future<void> sendOTP() async {
+    final phone = phoneController.text.trim();
+
+    if (phone.length != 10 || !RegExp(r'^\d{10}$').hasMatch(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a valid 10-digit phone number.'),
+        ),
+      );
+      return;
     }
+
+    setState(() => isLoading = true);
+
+    final result = await ApiService.checkPatientPhone(
+      phone: phone,
+    );
+
+    if (!mounted) return;
+
+    setState(() => isLoading = false);
+
+    if (result['status'] == 'success') {
+      final patient = result['patient'];
+
+      setState(() {
+        patientId = int.tryParse(
+          patient['patient_id'].toString(),
+        );
+        patientName = patient['full_name']?.toString();
+        otpSent = true;
+        otpVerified = false;
+        otpController.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Patient account found. For testing, use OTP: 123456',
+          ),
+        ),
+      );
+    } else {
+      setState(() {
+        otpSent = false;
+        otpVerified = false;
+        patientId = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result['message'] ?? 'Patient account not found.',
+          ),
+        ),
+      );
+    }
+  }
+
+  void verifyOTP() {
+    if (otpController.text.trim() == '123456') {
+      setState(() => otpVerified = true);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Phone number verified successfully.'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid OTP. Please try again.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> loginPatient() async {
+    if (!otpVerified || patientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please verify your phone number first.'),
+        ),
+      );
+      return;
+    }
+
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('patientId', patientId!);
+    await prefs.setBool('isRegistered', true);
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HomeScreen(),
+      ),
+      (route) => false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const primaryColor = Colors.green;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7FAFC),
+      appBar: AppBar(
+        title: const Text('Patient Login'),
+        backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 24),
+            const CircleAvatar(
+              radius: 42,
+              backgroundColor: Color(0xFFE8F5E9),
+              child: Icon(
+                Icons.person_outline,
+                size: 44,
+                color: primaryColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Welcome Back!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF26384A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Login with your registered phone number',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 30),
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              maxLength: 10,
+              decoration: InputDecoration(
+                labelText: 'Phone Number',
+                hintText: 'Enter registered phone number',
+                prefixIcon: const Icon(Icons.phone_outlined),
+                counterText: '',
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                suffixIcon: IconButton(
+                  onPressed: isLoading ? null : sendOTP,
+                  icon: const Icon(Icons.send),
+                ),
+              ),
+            ),
+            if (otpSent) ...[
+              const SizedBox(height: 18),
+              TextField(
+                controller: otpController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: InputDecoration(
+                  labelText: 'OTP',
+                  hintText: 'Enter 6-digit test OTP',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  counterText: '',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                 
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                otpVerified
+                    ? 'Phone number verified'
+                    : 'College project testing OTP: 123456',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: otpVerified ? Colors.green : Colors.grey,
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // The Verify button. After a successful check it
+              // changes to a green "Verified" and cannot be tapped again.
+              SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  // "null" disables the button once the number is verified
+                  onPressed: otpVerified ? null : verifyOTP,
+                  icon: Icon(
+                    otpVerified
+                        ? Icons.check_circle
+                        : Icons.verified_outlined,
+                  ),
+                  label: Text(
+                    otpVerified ? 'Verified' : 'Verify',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    // Keeps the button green when it is disabled
+                    disabledForegroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],    
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                onPressed: isLoading ? null : loginPatient,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: isLoading
+                    ? const CircularProgressIndicator(
+                        color: Colors.white,
+                      )
+                    : const Text(
+                        'Login',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// HOME SCREEN
+// ============================================================
+
   class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -4563,7 +4928,59 @@ class _HomeScreenState extends State<HomeScreen> {
                   
     ),
   ),
+                      const SizedBox(height: 12),
+
+            // ------------------------------------------------
+            // MY PRESCRIPTIONS
+            // Opens the list of prescriptions issued by doctors.
+            // ------------------------------------------------
+
+            Card(
+              elevation: 3,
+              child: ListTile(
+                // Icon on the left, styled like the other cards
+                leading: CircleAvatar(
+                  radius: 27,
+                  backgroundColor: Colors.teal.shade50,
+                  child: const Icon(
+                    Icons.medication,
+                    color: Colors.teal,
+                    size: 30,
+                  ),
+                ),
+
+                title: const Text(
+                  'My Prescriptions',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                subtitle: const Text(
+                  'View prescriptions from your doctors',
+                ),
+
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                ),
+
+                // When tapped, open the new screen we just created
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const PatientPrescriptionsScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+
             const SizedBox(height: 20),
+
+           
 
             // =================================================
             // GPS + SOS SECTION
@@ -4793,19 +5210,47 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(width: 10),
 
-                Expanded(
-                  child: serviceCard(
-                    Icons.local_pharmacy,
-                    tr('Order\nMedicine', selectedLanguage),
+                   Expanded(
+                  // GestureDetector makes the card react to a tap
+                  child: GestureDetector(
+                    onTap: () {
+                      // Open the new Order Medicine page, which has the
+                      // three options: order from a prescription,
+                      // your orders, and track your order.
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const OrderMedicineHomeScreen(),
+                        ),
+                      ); 
+                    },
+                    child: serviceCard(
+                      Icons.local_pharmacy,
+                      tr('Order\nMedicine', selectedLanguage),
+                    ),
                   ),
                 ),
 
                 const SizedBox(width: 10),
 
-                Expanded(
-                  child: serviceCard(
-                    Icons.folder_shared,
-                    tr('My Health\nRecords', selectedLanguage),
+                               Expanded(
+                  // GestureDetector makes the card react to a tap
+                  child: GestureDetector(
+                    onTap: () {
+                      // Open the patient's health record screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const PatientHealthRecordScreen(),
+                        ),
+                      );
+                    },
+                    child: serviceCard(
+                      Icons.folder_shared,
+                      tr('My Health\nRecords', selectedLanguage),
+                    ),
                   ),
                 ),
 
@@ -5721,11 +6166,6 @@ class TriageResultScreen extends StatelessWidget {
   }
 
   // ------------------------------------------------------------
-  // SOS
-  // ------------------------------------------------------------
-
- 
-  // ------------------------------------------------------------
   // CONSULTATION
   // ------------------------------------------------------------
 
@@ -6144,9 +6584,9 @@ final List<Map<String, dynamic>> specialties = [
     'icon': Icons.medical_services_rounded,
     'color': Color(0xFF3F6FA8),
   },
-  {
+    {
     'name': 'Gynecologist',
-    'icon': Icons.favorite_rounded,
+    'icon': Icons.woman_rounded, // A woman icon instead of the heart
     'color': Color(0xFFC9829B),
   },
   {
@@ -8902,6 +9342,40 @@ Widget _detailRow(
     );
   }
 
+
+Future<void> joinVideoConsultation(
+  Map<String, dynamic> appointment,
+) async {
+  final prefs = await SharedPreferences.getInstance();
+
+  final patientId = prefs.getInt('patientId');
+
+  final appointmentId = int.tryParse(
+    appointment['appointment_id'].toString(),
+  );
+
+  if (!mounted) return;
+
+  if (patientId == null || appointmentId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Patient or appointment information not found'),
+      ),
+    );
+    return;
+  }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => VideoCallScreen(
+        appointmentId: appointmentId,
+        participantId: patientId,
+        participantRole: 'patient',
+      ),
+    ),
+  );
+}
   Widget buildAppointmentCard(
     Map<String, dynamic> appointment,
     int index,
@@ -9095,6 +9569,35 @@ Widget _detailRow(
               ),
             ],
           ),
+          
+if (appointment['consultation_mode']
+            ?.toString()
+            .toLowerCase() == 'online' &&
+    appointment['status']?.toString() == 'Scheduled') ...[
+  const SizedBox(height: 14),
+
+  SizedBox(
+    width: double.infinity,
+    height: 48,
+    child: ElevatedButton.icon(
+      onPressed: () {
+        joinVideoConsultation(appointment);
+      },
+      icon: const Icon(Icons.video_call),
+      label: Text(
+        tr('Join Video Consultation', selectedLanguage),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    ),
+  ),
+],
         ],
       ),
     );
@@ -9410,6 +9913,8 @@ void initState() {
     );
   }
 }
+
+
 // ============================================================
 // PROFILE SCREEN
 // ============================================================
@@ -17200,22 +17705,38 @@ class _DoctorKycScreenState extends State<DoctorKycScreen> {
             'Your account is now under verification.',
           ),
           actions: [
-            TextButton(
-              onPressed: () {
+                       TextButton(
+              onPressed: () async {
+                // Remember the doctor on the phone, so next time the app
+                // can open the dashboard directly without logging in again
+                await DoctorSession.save(
+                  doctorId: widget.doctorId,
+                  doctorName: widget.doctorName,
+                  doctorSpecialization: widget.doctorSpecialization,
+                  doctorQualification: widget.doctorQualification,
+                  doctorExperience: widget.doctorExperience,
+                  doctorAvailability: widget.doctorAvailability,
+                );
+
+                // The popup may have been closed while we were saving
+                if (!context.mounted) return;
+
+                // Close the popup (same as before)
                 Navigator.pop(context);
 
+                // Open the dashboard (same as before)
                 Navigator.pushReplacement(
-                       context,
-                      MaterialPageRoute(
-                       builder: (context) => DoctorDashboardScreen(
-                       doctorId: widget.doctorId,
-                       doctorName: widget.doctorName,
-                       doctorSpecialization: widget.doctorSpecialization,
-                       doctorQualification: widget.doctorQualification,
-                       doctorExperience: widget.doctorExperience,
-                       doctorAvailability: widget.doctorAvailability,
-                     ),
-                   ),
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DoctorDashboardScreen(
+                      doctorId: widget.doctorId,
+                      doctorName: widget.doctorName,
+                      doctorSpecialization: widget.doctorSpecialization,
+                      doctorQualification: widget.doctorQualification,
+                      doctorExperience: widget.doctorExperience,
+                      doctorAvailability: widget.doctorAvailability,
+                    ),
+                  ),
                 );
               },
               child: const Text('Continue'),
@@ -17622,7 +18143,8 @@ String? doctorAvailability;
     }
   }
 
-  void loginDoctor() {
+  Future<void> loginDoctor() async {
+    // The doctor must verify the phone number first
     if (!otpVerified) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -17632,19 +18154,34 @@ String? doctorAvailability;
       return;
     }
 
-   Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(
-    builder: (context) => DoctorDashboardScreen(
+    // Remember the doctor on the phone, so next time the app
+    // can open the dashboard directly without logging in again
+    await DoctorSession.save(
       doctorId: doctorId!,
       doctorName: doctorName!,
       doctorSpecialization: doctorSpecialization!,
       doctorQualification: doctorQualification!,
       doctorExperience: doctorExperience!,
       doctorAvailability: doctorAvailability!,
-    ),
-  ),
-); 
+    );
+
+    // The screen may have been closed while we were saving
+    if (!mounted) return;
+
+    // Open the dashboard (same as before)
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DoctorDashboardScreen(
+          doctorId: doctorId!,
+          doctorName: doctorName!,
+          doctorSpecialization: doctorSpecialization!,
+          doctorQualification: doctorQualification!,
+          doctorExperience: doctorExperience!,
+          doctorAvailability: doctorAvailability!,
+        ),
+      ),
+    );
   }
 
   Widget inputField({
@@ -17759,15 +18296,7 @@ String? doctorAvailability;
                 controller: otpController,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    otpVerified
-                        ? Icons.check_circle
-                        : Icons.verified_outlined,
-                    color: otpVerified ? Colors.green : null,
-                  ),
-                  onPressed: otpVerified ? null : verifyOTP,
-                ),
+                
               ),
 
               const SizedBox(height: 8),
@@ -17782,7 +18311,40 @@ String? doctorAvailability;
                 ),
               ),
 
+              const SizedBox(height: 14),
+
+              // The Verify button. After a successful check it
+              // changes to a green "Verified" and cannot be tapped again.
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  // "null" disables the button once the number is verified
+                  onPressed: otpVerified ? null : verifyOTP,
+                  icon: Icon(
+                    otpVerified
+                        ? Icons.check_circle
+                        : Icons.verified_outlined,
+                  ),
+                  label: Text(
+                    otpVerified ? 'Verified' : 'Verify',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    // Keeps the button green when it is disabled
+                    disabledForegroundColor: Colors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 24),
+            
             ],
 
             SizedBox(
@@ -17954,11 +18516,50 @@ class DoctorDashboardScreen extends StatelessWidget {
     ),
   ),
 
-  actions: [
+    actions: [
     IconButton(
       icon: const Icon(Icons.logout),
-      onPressed: () {
-        Navigator.pop(context);
+      tooltip: 'Logout',
+      onPressed: () async {
+        // Ask first, so a doctor cannot log out by accident
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Logout'),
+              content: const Text('Do you want to log out?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Logout'),
+                ),
+              ],
+            );
+          },
+        );
+
+        // The doctor tapped Cancel (or closed the popup)
+        if (confirmed != true) return;
+
+        // Forget the saved doctor login
+        await DoctorSession.clear();
+
+        // The screen may have been closed while we were clearing
+        if (!context.mounted) return;
+
+        // Go back to the start screen and remove all earlier screens,
+        // so the back button cannot return to the dashboard
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const LanguageSelectionScreen(),
+          ),
+          (route) => false,
+        );
       },
     ),
   ],
@@ -18204,15 +18805,19 @@ class DoctorDashboardScreen extends StatelessWidget {
               subtitle:
                   'Create and manage prescriptions for patients.',
               iconColor: Colors.teal,
-              onTap: () {
+                            onTap: () {
                 Navigator.push(
-                   context,
-                 MaterialPageRoute(
-                builder: (context) =>
-                 const DoctorPrescriptionsScreen(),
-               ),
-             );
-            },
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DoctorPrescriptionsScreen(
+                      // doctorId is a value the dashboard already has,
+                      // so we can pass it straight to the next screen.
+                      // ("const" is removed because the value is not fixed.)
+                      doctorId: doctorId,
+                    ),
+                  ),
+                );
+              },
           ),
 
             // ------------------------------------------------
@@ -19216,7 +19821,33 @@ Future<void> completeAppointment(
   }
 }
 
-  
+void joinDoctorVideoConsultation(
+  Map<String, dynamic> appointment,
+) {
+  final appointmentId = int.tryParse(
+    appointment['appointment_id'].toString(),
+  );
+
+  if (appointmentId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Appointment ID not found'),
+      ),
+    );
+    return;
+  }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => VideoCallScreen(
+        appointmentId: appointmentId,
+        participantId: widget.doctorId,
+        participantRole: 'doctor',
+      ),
+    ),
+  );
+}  
   // ----------------------------------------------------------
   // APPOINTMENT CARD
   // ----------------------------------------------------------
@@ -19341,7 +19972,32 @@ if (status == 'Scheduled') ...[
   ),
 ],
 
+if (status == 'Scheduled' &&
+    appointment['consultation_mode']
+            ?.toString()
+            .toLowerCase() ==
+        'online') ...[
+  const SizedBox(height: 12),
 
+  SizedBox(
+    width: double.infinity,
+    height: 46,
+    child: ElevatedButton.icon(
+      onPressed: () {
+        joinDoctorVideoConsultation(appointment);
+      },
+      icon: const Icon(Icons.video_call),
+      label: const Text('Join Video Consultation'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    ),
+  ),
+],
 
             const SizedBox(height: 10),
 
@@ -19589,20 +20245,21 @@ Future<void> loadConsultations() async {
     });
   }
 }
-    void startConsultation(Map<String, dynamic> consultation) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-       builder: (context) => DoctorConsultationDetailsScreen(
-         consultation: consultation,
-           appointmentId: int.parse(
-             consultation['appointment_id'].toString(),
-          ),
+ 
+void startConsultation(Map<String, dynamic> consultation) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => VideoCallScreen(
+        appointmentId: int.parse(
+          consultation['appointment_id'].toString(),
         ),
+        participantId: widget.doctorId,
+        participantRole: 'doctor',
       ),
-    );
-  }
-
+    ),
+  );
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -21126,7 +21783,15 @@ class DoctorPatientMedicalRecordScreen extends StatelessWidget {
 // ============================================================
 
 class DoctorPrescriptionsScreen extends StatefulWidget {
-  const DoctorPrescriptionsScreen({super.key});
+  // The ID of the logged-in doctor.
+  // It is optional (the "?" means it can be empty), so any place
+  // that opens this screen without an ID will still work.
+  final int? doctorId;
+
+  const DoctorPrescriptionsScreen({
+    super.key,
+    this.doctorId, // Receives the doctor ID from the dashboard
+  });
 
   @override
   State<DoctorPrescriptionsScreen> createState() =>
@@ -21135,45 +21800,121 @@ class DoctorPrescriptionsScreen extends StatefulWidget {
 
 class _DoctorPrescriptionsScreenState
     extends State<DoctorPrescriptionsScreen> {
-  final List<Map<String, String>> prescriptions = [
-    {
-      'patientName': 'Rahul Kumar',
-      'date': '20 September 2026',
-      'diagnosis': 'Viral Fever',
-      'medicines': 'Paracetamol 500 mg, Cetirizine 10 mg',
-      'status': 'Digitally Signed',
-    },
-    {
-      'patientName': 'Anjali Sharma',
-      'date': '18 September 2026',
-      'diagnosis': 'Common Cold',
-      'medicines': 'Paracetamol 500 mg',
-      'status': 'Digitally Signed',
-    },
-  ];
+   // The doctor's real prescriptions, loaded from the server.
+  // Each one is stored in the same simple format the list and
+  // details screens already use, so those screens don't change.
+    List<Map<String, String>> prescriptions = [];
 
-  void openPrescription(
+  // The same prescriptions in the same order, but with the full
+  // details. It is used to build the PDF.
+  List<Map<String, dynamic>> rawPrescriptions = [];
+
+  // initState runs once, when the screen first opens
+  @override
+  void initState() {
+    super.initState();
+    loadPrescriptions(); // Start loading right away
+  }
+
+  // Asks the server for this doctor's prescriptions
+  Future<void> loadPrescriptions() async {
+    // widget.doctorId is the ID passed in from the dashboard
+    final doctorId = widget.doctorId;
+
+    // Without an ID we cannot load anything
+    if (doctorId == null) return;
+
+    try {
+      final data = await ApiService.getDoctorPrescriptions(doctorId);
+
+      // If the doctor left this screen while waiting, stop here
+      if (!mounted) return;
+
+      setState(() {
+        // Keep the full data from the server (with every medicine detail).
+        // It is used to build the PDF.
+        rawPrescriptions = data;
+
+        // Convert each server prescription into the simple format
+        prescriptions = data.map<Map<String, String>>((item) {
+          // The medicines for this prescription
+          final medicineList = List<Map<String, dynamic>>.from(
+            item['medicines'] ?? [],
+          );
+
+          // Turn them into text, e.g. "paracetamol 200mg, cetirizine 10mg"
+          final medicineText = medicineList.map((medicine) {
+            final name = (medicine['medicine'] ?? '').toString();
+            final dose = (medicine['dosage'] ?? '').toString();
+            return dose.isEmpty ? name : '$name $dose';
+          }).join(', ');
+
+          return <String, String>{
+            'patientName': (item['patient_name'] ?? '').toString(),
+            'date': (item['prescription_date'] ?? '').toString(),
+            'diagnosis': (item['diagnosis'] ?? '').toString(),
+            'medicines': medicineText,
+            // A prescription can only be issued after signing,
+            // so every saved one is shown as signed.
+            'status': 'Digitally Signed',
+          };
+        }).toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      // Show the problem at the bottom of the screen
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+        ),
+      );
+    }
+  }
+
+   void openPrescription(
     Map<String, String> prescription,
   ) {
+    // Find the position of this prescription in the list. The full
+    // details are kept in rawPrescriptions at the same position.
+    final position = prescriptions.indexOf(prescription);
+
+    // If we found it, take the full details (otherwise leave it empty)
+    final full = (position >= 0 && position < rawPrescriptions.length)
+        ? rawPrescriptions[position]
+        : null;
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) =>
             DoctorPrescriptionDetailsScreen(
           prescription: prescription,
+          fullPrescription: full, // Used to build the PDF
         ),
       ),
     );
   }
 
-  void openCreatePrescription() {
-    Navigator.push(
+  Future<void> openCreatePrescription() async {
+    // "await" makes the code below wait until the doctor
+    // comes back from the Create Prescription screen
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            const DoctorCreatePrescriptionScreen(),
+        builder: (context) => DoctorCreatePrescriptionScreen(
+          // "widget." reads the value given to DoctorPrescriptionsScreen.
+          // This hands the doctor's ID to the Create Prescription screen.
+          doctorId: widget.doctorId,
+        ),
       ),
     );
+
+    // The doctor is back on this screen: reload the list
+    // so a newly issued prescription shows up
+    loadPrescriptions();
   }
 
   @override
@@ -21388,639 +22129,6 @@ class _DoctorPrescriptionsScreenState
 
 
 // ============================================================
-// CREATE PRESCRIPTION SCREEN
-// ============================================================
-
-class DoctorCreatePrescriptionScreen
-    extends StatefulWidget {
-  const DoctorCreatePrescriptionScreen({
-    super.key,
-  });
-
-  @override
-  State<DoctorCreatePrescriptionScreen> createState() =>
-      _DoctorCreatePrescriptionScreenState();
-}
-
-class _DoctorCreatePrescriptionScreenState
-    extends State<DoctorCreatePrescriptionScreen> {
-  final TextEditingController patientController =
-      TextEditingController();
-
-  final TextEditingController diagnosisController =
-      TextEditingController();
-
-  final TextEditingController medicineController =
-      TextEditingController();
-
-  final TextEditingController dosageController =
-      TextEditingController();
-
-  final TextEditingController frequencyController =
-      TextEditingController();
-
-  final TextEditingController durationController =
-      TextEditingController();
-
-  final TextEditingController instructionsController =
-      TextEditingController();
-
-  final List<Map<String, String>> medicines = [];
-
-  bool signatureAdded = false;
-
-  @override
-  void dispose() {
-    patientController.dispose();
-    diagnosisController.dispose();
-    medicineController.dispose();
-    dosageController.dispose();
-    frequencyController.dispose();
-    durationController.dispose();
-    instructionsController.dispose();
-    super.dispose();
-  }
-
-  void addMedicine() {
-    if (medicineController.text.trim().isEmpty ||
-        dosageController.text.trim().isEmpty ||
-        frequencyController.text.trim().isEmpty ||
-        durationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please complete the medicine details.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      medicines.add({
-        'medicine': medicineController.text.trim(),
-        'dosage': dosageController.text.trim(),
-        'frequency':
-            frequencyController.text.trim(),
-        'duration':
-            durationController.text.trim(),
-        'instructions':
-            instructionsController.text.trim(),
-      });
-
-      medicineController.clear();
-      dosageController.clear();
-      frequencyController.clear();
-      durationController.clear();
-      instructionsController.clear();
-    });
-  }
-
-  void removeMedicine(int index) {
-    setState(() {
-      medicines.removeAt(index);
-    });
-  }
-
-  Future<void> addDigitalSignature() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Digital Signature'),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.draw_outlined,
-                size: 55,
-                color: Color(0xFF3F6FA8),
-              ),
-              SizedBox(height: 15),
-              Text(
-                'Signature capture will allow the doctor to sign the prescription digitally.',
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 12),
-              Text(
-                'For the current frontend POC, the signature is represented as a verified digital signature.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context, false);
-              },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context, true);
-              },
-              child: const Text('Add Signature'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result == true) {
-      setState(() {
-        signatureAdded = true;
-      });
-    }
-  }
-
-  void issuePrescription() {
-    if (patientController.text.trim().isEmpty ||
-        diagnosisController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please enter patient and diagnosis details.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (medicines.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please add at least one medicine.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (!signatureAdded) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Please add the doctor digital signature.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            'Prescription Issued',
-          ),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.verified_outlined,
-                size: 60,
-                color: Colors.green,
-              ),
-              SizedBox(height: 15),
-              Text(
-                'The prescription has been digitally signed and issued successfully.',
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context);
-              },
-              child: const Text('Done'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget inputField({
-    required String label,
-    required String hint,
-    required IconData icon,
-    required TextEditingController controller,
-    TextInputType? keyboardType,
-    int maxLines = 1,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon),
-        alignLabelWithHint: maxLines > 1,
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius:
-              BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor:
-          const Color(0xFFF7FAFC),
-      appBar: AppBar(
-        title: const Text(
-          'Create Prescription',
-        ),
-        backgroundColor:
-            const Color(0xFF3F6FA8),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-          children: [
-
-            // ==================================================
-            // PATIENT DETAILS
-            // ==================================================
-
-            const Text(
-              'Patient Details',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF26384A),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            inputField(
-              label: 'Patient Name',
-              hint: 'Enter patient name',
-              icon: Icons.person_outline,
-              controller: patientController,
-            ),
-
-            const SizedBox(height: 14),
-
-            inputField(
-              label: 'Diagnosis',
-              hint: 'Enter diagnosis',
-              icon: Icons
-                  .medical_information_outlined,
-              controller: diagnosisController,
-            ),
-
-            const SizedBox(height: 25),
-
-            // ==================================================
-            // MEDICINE DETAILS
-            // ==================================================
-
-            const Text(
-              'Medicine Details',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF26384A),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            inputField(
-              label: 'Medicine Name',
-              hint: 'Example: Paracetamol',
-              icon: Icons.medication_outlined,
-              controller: medicineController,
-            ),
-
-            const SizedBox(height: 14),
-
-            inputField(
-              label: 'Dosage',
-              hint: 'Example: 500 mg',
-              icon: Icons.science_outlined,
-              controller: dosageController,
-            ),
-
-            const SizedBox(height: 14),
-
-            inputField(
-              label: 'Frequency',
-              hint: 'Example: Twice daily',
-              icon: Icons.schedule_outlined,
-              controller: frequencyController,
-            ),
-
-            const SizedBox(height: 14),
-
-            inputField(
-              label: 'Duration',
-              hint: 'Example: 3 days',
-              icon: Icons.timer_outlined,
-              controller: durationController,
-            ),
-
-            const SizedBox(height: 14),
-
-            inputField(
-              label: 'Instructions',
-              hint:
-                  'Example: Take after food',
-              icon: Icons.notes_outlined,
-              controller: instructionsController,
-              maxLines: 2,
-            ),
-
-            const SizedBox(height: 15),
-
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: OutlinedButton.icon(
-                onPressed: addMedicine,
-                icon: const Icon(Icons.add),
-                label: const Text(
-                  'Add Medicine',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            // ==================================================
-            // ADDED MEDICINES
-            // ==================================================
-
-            if (medicines.isNotEmpty) ...[
-              const Text(
-                'Added Medicines',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF26384A),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              ...List.generate(
-                medicines.length,
-                (index) {
-                  final medicine =
-                      medicines[index];
-
-                  return Card(
-                    margin:
-                        const EdgeInsets.only(
-                      bottom: 10,
-                    ),
-                    elevation: 1,
-                    child: Padding(
-                      padding:
-                          const EdgeInsets.all(14),
-                      child: Row(
-                        crossAxisAlignment:
-                            CrossAxisAlignment
-                                .start,
-                        children: [
-                          const Icon(
-                            Icons
-                                .medication_outlined,
-                            color:
-                                Color(0xFF3F6FA8),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment
-                                      .start,
-                              children: [
-                                Text(
-                                  medicine[
-                                      'medicine']!,
-                                  style:
-                                      const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight:
-                                        FontWeight
-                                            .bold,
-                                  ),
-                                ),
-                                const SizedBox(
-                                    height: 5),
-                                Text(
-                                  '${medicine['dosage']} • ${medicine['frequency']} • ${medicine['duration']}',
-                                  style:
-                                      const TextStyle(
-                                    fontSize: 12,
-                                    color:
-                                        Colors.grey,
-                                  ),
-                                ),
-                                if (medicine[
-                                        'instructions']!
-                                    .isNotEmpty) ...[
-                                  const SizedBox(
-                                      height: 5),
-                                  Text(
-                                    medicine[
-                                        'instructions']!,
-                                    style:
-                                        const TextStyle(
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () {
-                              removeMedicine(
-                                index,
-                              );
-                            },
-                            icon: const Icon(
-                              Icons
-                                  .delete_outline,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 15),
-            ],
-
-            // ==================================================
-            // DIGITAL SIGNATURE
-            // ==================================================
-
-            const Text(
-              'Digital Signature',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF26384A),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            Container(
-              width: double.infinity,
-              padding:
-                  const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    BorderRadius.circular(16),
-                border: Border.all(
-                  color:
-                      const Color(0xFFDCE5EE),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    signatureAdded
-                        ? Icons
-                            .verified_outlined
-                        : Icons
-                            .draw_outlined,
-                    size: 45,
-                    color: signatureAdded
-                        ? Colors.green
-                        : const Color(
-                            0xFF3F6FA8),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    signatureAdded
-                        ? 'Doctor Signature Added'
-                        : 'Doctor Signature Required',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight:
-                          FontWeight.bold,
-                      color: signatureAdded
-                          ? Colors.green
-                          : const Color(
-                              0xFF26384A),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    signatureAdded
-                        ? 'Prescription is ready to be digitally signed and issued.'
-                        : 'Add your digital signature before issuing the prescription.',
-                    textAlign:
-                        TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 45,
-                    child: OutlinedButton.icon(
-                      onPressed:
-                          addDigitalSignature,
-                      icon: Icon(
-                        signatureAdded
-                            ? Icons.edit_outlined
-                            : Icons.draw_outlined,
-                      ),
-                      label: Text(
-                        signatureAdded
-                            ? 'Change Signature'
-                            : 'Add Digital Signature',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            // ==================================================
-            // ISSUE PRESCRIPTION
-            // ==================================================
-
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed:
-                    issuePrescription,
-                icon: const Icon(
-                  Icons.verified_outlined,
-                ),
-                label: const Text(
-                  'Sign & Issue Prescription',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight:
-                        FontWeight.bold,
-                  ),
-                ),
-                style:
-                    ElevatedButton.styleFrom(
-                  backgroundColor:
-                      const Color(0xFF3F6FA8),
-                  foregroundColor:
-                      Colors.white,
-                  shape:
-                      RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(
-                            14),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-
-// ============================================================
 // PRESCRIPTION DETAILS SCREEN
 // ============================================================
 
@@ -22028,9 +22136,15 @@ class DoctorPrescriptionDetailsScreen
     extends StatelessWidget {
   final Map<String, String> prescription;
 
+  // The full prescription with every medicine detail.
+  // It is optional (the "?" means it can be empty) so the screen
+  // still works wherever it is opened without it.
+  final Map<String, dynamic>? fullPrescription;
+
   const DoctorPrescriptionDetailsScreen({
     super.key,
     required this.prescription,
+    this.fullPrescription,
   });
 
   @override
@@ -22302,16 +22416,33 @@ class DoctorPrescriptionDetailsScreen
               width: double.infinity,
               height: 48,
               child: OutlinedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Prescription download will be connected later.',
+                  onPressed: () async {
+                  // Without the full details we cannot build the PDF
+                  final full = fullPrescription;
+
+                  if (full == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Prescription details are not available.',
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                    return;
+                  }
+
+                  try {
+                    // Build the PDF and open the share/save screen
+                    await downloadPrescriptionPdf(full);
+                  } catch (e) {
+                    // If something goes wrong, tell the doctor
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not create the PDF.'),
+                      ),
+                    );
+                  }
                 },
                 icon: const Icon(
                   Icons.download_outlined,

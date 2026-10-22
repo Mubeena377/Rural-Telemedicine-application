@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
-
+import 'doctor_create_prescription_screen.dart';
 import 'api_service.dart';
 
 class VideoCallScreen extends StatefulWidget {
@@ -254,9 +254,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     super.dispose();
   }
 
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+  if (widget.participantRole.toLowerCase() == 'doctor') {
+    return _buildDoctorLayout();
+  }
+
+  return _buildPatientLayout();
+}
+
+Widget _buildPatientLayout() {
+  return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
@@ -509,4 +518,376 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       ],
     );
   }
+  // New layout shown only to the doctor.
+
+Widget _buildDoctorLayout() {
+  const navy = Color(0xFF10182F);
+  const blue = Color(0xFF2864E8);
+  const pageColor = Color(0xFFF5F7FB);
+
+  return Scaffold(
+    backgroundColor: navy,
+    body: SafeArea(
+      child: Column(
+        children: [
+          // Back button
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: IconButton(
+                onPressed: () => Navigator.maybePop(context),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: navy,
+                ),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ),
+
+          // Scrollable doctor consultation content
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              children: [
+                // Video panel
+                Container(
+                  height: 245,
+                  decoration: BoxDecoration(
+                    color: navy,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: blue,
+                      width: 2,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _remoteUid != null && _engineCreated
+                            ? AgoraVideoView(
+                                controller: VideoViewController.remote(
+                                  rtcEngine: _engine,
+                                  canvas: VideoCanvas(uid: _remoteUid!),
+                                  connection: RtcConnection(
+                                    channelId: _channelName,
+                                  ),
+                                ),
+                              )
+                            : _waitingScreen(),
+                      ),
+
+                      // Patient details: replace with real appointment data later
+                      Positioned(
+                        top: 16,
+                        left: 16,
+                        right: 16,
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Patient consultation',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _isJoined ? 'LIVE' : 'CONNECTING',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Small local camera preview
+                      Positioned(
+                        right: 12,
+                        top: 52,
+                        width: 72,
+                        height: 88,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF273149),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white54),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: _isCameraOff
+                              ? const Icon(
+                                  Icons.videocam_off,
+                                  color: Colors.white,
+                                )
+                              : _engineCreated
+                                  ? AgoraVideoView(
+                                      controller: VideoViewController(
+                                        rtcEngine: _engine,
+                                        canvas: const VideoCanvas(uid: 0),
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.person,
+                                      color: Colors.white,
+                                    ),
+                        ),
+                      ),
+
+                      // Call controls
+                      Positioned(
+                        bottom: 12,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _doctorCallButton(
+                              icon: _isMuted ? Icons.mic_off : Icons.mic,
+                              label: '',
+                              onPressed: _toggleMicrophone,
+                            ),
+                            const SizedBox(width: 14),
+                            _doctorCallButton(
+                              icon: _isCameraOff
+                                  ? Icons.videocam_off
+                                  : Icons.videocam,
+                              label: '',
+                              onPressed: _toggleCamera,
+                            ),
+                            const SizedBox(width: 14),
+                            _doctorCallButton(
+                              icon: Icons.call_end,
+                              label: '',
+                              onPressed: _endCall,
+                              isEnd: true,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
+                  TextButton(
+                    onPressed: _startCall,
+                    child: const Text(
+                      'Try Again',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 16),
+
+                // Examination intake
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: pageColor,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Examination Intake',
+                              style: TextStyle(
+                                color: navy,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'EHR history screen will be connected later.',
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'View EHR History',
+                              style: TextStyle(
+                                color: blue,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      _intakeField(
+                        'Symptoms Reported',
+                        'Patient symptoms will appear here',
+                      ),
+                      _intakeField(
+                        'Examination Findings',
+                        'Enter examination findings',
+                      ),
+                      _intakeField(
+                        'Diagnosis',
+                        'Enter diagnosis',
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // Clinical action buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                       onPressed: () {
+                       Navigator.push(
+                          context,
+                        MaterialPageRoute(
+                        builder: (context) => DoctorCreatePrescriptionScreen(
+                        // In the doctor's call screen, participantId is the doctor's ID.
+                        // "widget." lets this code read the values given to VideoCallScreen.
+                           doctorId: widget.participantId,
+                        ),
+                       ),
+                      );
+                     },
+                        icon: const Icon(Icons.check),
+                        label: const Text('Write Rx'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Lab-order screen will be connected later.',
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Order Lab'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white70),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// Compact controls used inside the doctor's video panel.
+Widget _doctorCallButton({
+  required IconData icon,
+  required String label,
+  required VoidCallback onPressed,
+  bool isEnd = false,
+}) {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, color: Colors.white),
+        style: IconButton.styleFrom(
+          backgroundColor: isEnd ? Colors.red : Colors.white24,
+        ),
+      ),
+      Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+        ),
+      ),
+    ],
+  );
+}
+
+// Reusable field for the examination intake card.
+Widget _intakeField(String title, String hint) {
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF334E68),
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          minLines: 1,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: const Color(0xFFF3F6FA),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 }
