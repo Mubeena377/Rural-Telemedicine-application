@@ -1,10 +1,10 @@
-**Rural Telemedicine Platform**
-
+              ** Rural Telemedicine Platform**
+              
 Contributors: @Mubeena377, @TeammateHandle,  @TeammateHandle
 
 A Flutter mobile application that lets rural patients consult doctors by video, receive digital prescriptions, order medicines, keep a health record, and call for emergency help, backed by a Flask API and a PostgreSQL database.
 
-1.** Overview & Problem Statement**
+**1.Overview & Problem Statement**
 The Challenge:
 People in rural areas often live far from doctors and hospitals. A simple consultation can mean hours of travel, lost wages and long waiting times.
 In an emergency, help does not know where the patient is, and the patient may not know whether the symptoms are serious.
@@ -15,7 +15,7 @@ Patients in rural and remote areas who have a smartphone and a mobile or Wi-Fi c
 Doctors who consult patients remotely.
 Future roles (already present in the database design): hospitals and ambulance services.
 
-2.** Architecture & Solution Logic**
+**2. Architecture & Solution Logic**
 Concept: A Flutter app with separate patient and doctor interfaces talks to a Flask REST API. The API stores data in PostgreSQL, issues Agora video-call tokens, runs a machine-learning triage model, and sends push notifications through Firebase Cloud Messaging.
 System architecture
 HTTP / JSON
