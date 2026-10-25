@@ -1,9 +1,10 @@
-Rural Telemedicine Platform
+**Rural Telemedicine Platform**
+
 Contributors: @Mubeena377, @TeammateHandle,  @TeammateHandle
 
 A Flutter mobile application that lets rural patients consult doctors by video, receive digital prescriptions, order medicines, keep a health record, and call for emergency help, backed by a Flask API and a PostgreSQL database.
 
-1. Overview & Problem Statement
+1.** Overview & Problem Statement**
 The Challenge:
 People in rural areas often live far from doctors and hospitals. A simple consultation can mean hours of travel, lost wages and long waiting times.
 In an emergency, help does not know where the patient is, and the patient may not know whether the symptoms are serious.
@@ -14,7 +15,7 @@ Patients in rural and remote areas who have a smartphone and a mobile or Wi-Fi c
 Doctors who consult patients remotely.
 Future roles (already present in the database design): hospitals and ambulance services.
 
-2. Architecture & Solution Logic
+2.** Architecture & Solution Logic**
 Concept: A Flutter app with separate patient and doctor interfaces talks to a Flask REST API. The API stores data in PostgreSQL, issues Agora video-call tokens, runs a machine-learning triage model, and sends push notifications through Firebase Cloud Messaging.
 System architecture
 HTTP / JSON
@@ -49,7 +50,7 @@ Push notifications	Firebase Cloud Messaging (firebase-admin, firebase_messaging)
 Machine learning	scikit-learn model loaded with joblib	Symptom triage
 PDF	pdf, printing packages	Prescription PDF with share sheet
 Maps and location	geolocator, flutter_map	SOS location
-API overview
+**API overview**
 Area	Examples of endpoints
 Accounts	/api/patients, /api/patients/check-phone, /api/doctors/register, /api/doctors/login
 Triage and SOS	/api/triage, /api/sos, /api/sos/<id>/status
@@ -59,7 +60,7 @@ Prescriptions	/api/prescriptions, /api/patients/<id>/prescriptions, /api/doctors
 Medicine orders	/api/medicine-orders, /api/patients/<id>/medicine-orders
 Health records	/api/patients/<id>/health-record, /api/patients/<id>/medical-records, /api/doctors/<id>/patients
 Notifications	/api/patients/<id>/device-token, /api/doctors/<id>/device-token, /api/patients/<id>/notifications/pending
-3. Key Features & Prototype
+**3. Key Features & Prototype**
 Patient
  Registration and login with phone number and OTP (a fixed test OTP is used in this prototype)
  AI symptom triage with emergency phrase detection
@@ -86,7 +87,7 @@ Platform
 Screenshots
 Add screenshots here, for example docs/screenshots/home.png, docs/screenshots/video-call.png and docs/screenshots/prescription.png.
 
-4. Scalability & Next Steps
+**4. Scalability & Next Steps**
 Phase 1 (Completed in Sprint): Core architecture and a working proof of concept: accounts, triage, SOS, booking, video consultation, prescriptions, medicine orders, health records and push notifications.
 Phase 2 (Future Scope):
 Doctor accept/reject of bookings, appointment reminders, medicine reminders and an in-app alerts list
@@ -134,7 +135,7 @@ flutter pub get
 flutter run
 For real phones, build for the phone chip with flutter build apk --debug --target-platform android-arm64 and install the result on each phone.
 
-Project Structure
+**Project Structure**
 text
 Rural-Telemedicine-application/
 ├── android/                 # Android project and Firebase setup
@@ -160,7 +161,7 @@ Rural-Telemedicine-application/
 │   └── doctor_patient_history_screen.dart
 ├── pubspec.yaml
 └── README.md
-Security Notes
+**Security Notes**
 backend/.env, backend/firebase-key.json and android/app/google-services.json must never be committed to the repository.
 This is a prototype: the OTP is a fixed test value, and the API does not yet verify who is calling it. Add real authentication before any real-world use, and check the telemedicine and data-protection rules that apply to you.
 Created during academic project.
