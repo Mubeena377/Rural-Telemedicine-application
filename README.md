@@ -1,6 +1,6 @@
 # Rural Telemedicine Platform
 
-> **Contributors:** [@Mubeena377](https://github.com/Mubeena377), [@TeammateGitHubHandle](https://github.com/)
+> **Contributors:** [@Mubeena](https://github.com/Mubeena377), [@Umme_Hani](https://github.com/umme99007-crypto), [@Shireen_Banu](https://github.com/Shireen8910)
 
 ---
 
