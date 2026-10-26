@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'push_service.dart';
 
 // ============================================================
 // DOCTOR SESSION
@@ -29,6 +30,10 @@ class DoctorSession {
     await prefs.setString('doctorQualification', doctorQualification);
     await prefs.setInt('doctorExperience', doctorExperience);
     await prefs.setString('doctorAvailability', doctorAvailability);
+
+    // Tell the server which phone this doctor is using, so it can
+    // send push notifications. It runs in the background.
+    registerDoctorPushToken(doctorId);
   }
 
   // Reads the saved doctor. Returns null if no doctor is logged in.
@@ -42,6 +47,9 @@ class DoctorSession {
     final doctorId = prefs.getInt('doctorId');
     if (doctorId == null) return null;
 
+    // The phone's token can change, so send it again at every start
+    registerDoctorPushToken(doctorId);
+
     return {
       'doctorId': doctorId,
       'doctorName': prefs.getString('doctorName') ?? '',
@@ -54,6 +62,10 @@ class DoctorSession {
 
   // Forgets the doctor (used by the logout button)
   static Future<void> clear() async {
+    // Tell the server to forget this phone, so it stops getting
+    // this doctor's notifications after logout
+    await forgetThisPhone();
+
     final prefs = await SharedPreferences.getInstance();
 
     await prefs.remove('doctorLoggedIn');

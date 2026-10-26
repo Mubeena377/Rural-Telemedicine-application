@@ -52,3 +52,7 @@ app.*.map.json
 /android/build/
 
 /android/build/
+
+# Secrets: never upload these
+.env
+backend/firebase-key.json

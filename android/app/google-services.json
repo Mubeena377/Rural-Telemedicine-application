@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "431945154096",
+    "project_id": "rural-telemedicine-bc3dd",
+    "storage_bucket": "rural-telemedicine-bc3dd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:431945154096:android:77ee20dad83d18d48477f5",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA8P8DSXdgmE4HJIFb4T3ieXD3qJs0uJBg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

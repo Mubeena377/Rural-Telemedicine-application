@@ -13,7 +13,14 @@ import 'patient_prescriptions_screen.dart';
 // ============================================================
 
 class PatientHealthRecordScreen extends StatefulWidget {
-  const PatientHealthRecordScreen({super.key});
+  // True when the screen is shown inside the "Records" tab of the
+  // home screen. It then has no title bar of its own.
+  final bool embedded;
+
+  const PatientHealthRecordScreen({
+    super.key,
+    this.embedded = false,
+  });
 
   @override
   State<PatientHealthRecordScreen> createState() =>
@@ -761,12 +768,15 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
-      appBar: AppBar(
-        title: const Text('My Health Records'),
-        backgroundColor: const Color(0xFF3F6FA8),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
+      // No title bar when shown inside the Records tab
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              title: const Text('My Health Records'),
+              backgroundColor: const Color(0xFF3F6FA8),
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),      
       body: buildBody(),
     );
   }

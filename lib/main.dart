@@ -9,12 +9,17 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'api_service.dart';
 import 'video_call_screen.dart';
+import 'push_service.dart';
 import 'doctor_create_prescription_screen.dart';
 import 'patient_prescriptions_screen.dart';
 import 'order_medicine_home_screen.dart';
 import 'prescription_pdf.dart';
 import 'doctor_session.dart';
 import 'patient_health_record_screen.dart';
+import 'patient_details_screen.dart';
+import 'doctor_patients_screen.dart';
+import 'emergency_screen.dart';
+import 'choose_language.dart';
 
 final ValueNotifier<String> ambulanceStatus =
     ValueNotifier<String>('Available');
@@ -2826,6 +2831,45 @@ set selectedLanguage(String value) {
   appLanguage.value = value;
 }
 
+Future<void> showLanguageSelector(BuildContext context) async {
+  const languages = <Map<String, String>>[
+    {'name': 'English', 'code': 'en_IN'},
+    {'name': 'Hindi', 'code': 'hi_IN'},
+    {'name': 'Kannada', 'code': 'kn_IN'},
+    {'name': 'Tamil', 'code': 'ta_IN'},
+    {'name': 'Telugu', 'code': 'te_IN'},
+    {'name': 'Malayalam', 'code': 'ml_IN'},
+    {'name': 'Marathi', 'code': 'mr_IN'},
+    {'name': 'Bengali', 'code': 'bn_IN'},
+  ];
+
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Choose language'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: languages.map((language) {
+            final code = language['code']!;
+            return RadioListTile<String>(
+              title: Text(language['name']!),
+              value: code,
+              groupValue: selectedLanguage,
+              onChanged: (value) {
+                if (value != null) {
+                  selectedLanguage = value;
+                  Navigator.pop(dialogContext);
+                }
+              },
+            );
+          }).toList(),
+        ),
+      );
+    },
+  );
+}
+
 class VoiceAssistant {
   final stt.SpeechToText speech = stt.SpeechToText();
 
@@ -2871,6 +2915,11 @@ Future<void> main() async {
     initializationSettings,
   );
 
+   // Start Firebase push notifications (the app still works if this fails)
+    // No "await" on purpose: the app must draw its first screen right away,
+  // even if push setup is slow. (unawaited comes from dart:async.)
+  unawaited(initPush(flutterLocalNotificationsPlugin));
+
   runApp(const RuralTelemedicineApp());
 }
 
@@ -2889,7 +2938,8 @@ Future<void> main() async {
             primarySwatch: Colors.green,
             scaffoldBackgroundColor: Colors.white,
           ),
-          home: SplashScreen(),
+          navigatorKey: appNavigatorKey, // Lets push_service.dart open screens
+          home: SplashScreen(),          
         );
       },
     );
@@ -3498,6 +3548,41 @@ Future<void> registerPatient() async {
       'patientName',
       nameController.text.trim(),
     );
+
+    await prefs.setString(
+  'patientDOB',
+  dobController.text.trim(),
+);
+
+await prefs.setString(
+  'patientGender',
+  selectedGender!,
+);
+
+await prefs.setString(
+  'patientAddress',
+  residentialAddressController.text.trim(),
+);
+
+await prefs.setString(
+  'patientPhone',
+  phoneController.text.trim(),
+);
+
+await prefs.setString(
+  'emergencyContactName',
+  emergencyNameController.text.trim(),
+);
+
+await prefs.setString(
+  'emergencyContactRelationship',
+  relationshipController.text.trim(),
+);
+
+await prefs.setString(
+  'emergencyContactPhone',
+  emergencyPhoneController.text.trim(),
+);
 
      await prefs.setInt(
        'patientId',
@@ -4685,6 +4770,133 @@ class _PatientLoginScreenState extends State<PatientLoginScreen> {
 class _HomeScreenState extends State<HomeScreen> {
   int currentIndex = 0;
 
+  // ----------------------------------------------------------
+  // "DOCTOR IS READY" NOTIFICATIONS
+  // Every 10 seconds the app asks the server whether the doctor
+  // has started a consultation, and shows a popup if so.
+  // ----------------------------------------------------------
+
+  // The timer that repeats the check
+  Timer? notificationTimer;
+
+  // True while a popup is on the screen (so two never stack up)
+  bool showingNotice = false;
+
+  // initState runs once, when the home screen first opens
+  @override
+  void initState() {
+    super.initState();
+
+    // Send this phone's token to the server
+    registerPatientPushToken();
+
+    // If the app was started by tapping a notification, open that
+    // video call once the home screen has finished drawing
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      openLaunchNotificationIfAny();
+    });
+
+    // Check right away, then every 10 seconds
+    checkNotifications();
+    notificationTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => checkNotifications(),
+    );
+  }
+
+  // dispose runs when the home screen closes. Stop the timer,
+  // otherwise it would keep running in the background.
+  @override
+  void dispose() {
+    notificationTimer?.cancel();
+    super.dispose();
+  }
+
+  // Asks the server for new "consultation started" notices
+  Future<void> checkNotifications() async {
+    // Do nothing if a popup is already showing
+    if (showingNotice || !mounted) return;
+
+    try {
+      // The patient ID was saved on the phone when the patient logged in
+      final prefs = await SharedPreferences.getInstance();
+      final patientId = prefs.getInt('patientId');
+
+      if (patientId == null) return;
+
+      // Ask the server (function we added in api_service.dart)
+      final notices = await ApiService.getPendingNotifications(patientId);
+
+      if (!mounted || notices.isEmpty) return;
+
+      // Show the newest notice
+      final notice = notices.first;
+      showingNotice = true;
+
+      // Mark it as read first, so it never pops up a second time
+      await ApiService.markNotificationRead(
+        patientId: patientId,
+        notificationId: notice['notification_id'] as int,
+      );
+
+      if (!mounted) {
+        showingNotice = false;
+        return;
+      }
+
+      // The popup. It returns true if the patient tapped "Join now".
+      final join = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.videocam, color: Colors.green, size: 30),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text((notice['title'] ?? 'Doctor is ready').toString()),
+                ),
+              ],
+            ),
+            content: Text((notice['message'] ?? '').toString()),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Later'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                icon: const Icon(Icons.video_call),
+                label: const Text('Join now'),
+              ),
+            ],
+          );
+        },
+      );
+
+      showingNotice = false;
+
+      // The patient tapped "Join now": open the video call
+      if (join == true && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VideoCallScreen(
+              appointmentId: notice['appointment_id'] as int,
+              participantId: patientId,
+              participantRole: 'patient',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // A failed check is not serious. Try again at the next tick.
+      showingNotice = false;
+      print('Notification check failed: $e');
+    }
+  }
+
   final VoiceAssistant voiceAssistant = VoiceAssistant();
   Future<void> startVoiceCommand(BuildContext context) async {
     final available = await voiceAssistant.initialize();
@@ -4800,6 +5012,9 @@ class _HomeScreenState extends State<HomeScreen> {
           });
         },
       )
+      : currentIndex == 2
+      // The Records tab shows the patient's health record
+      ? const PatientHealthRecordScreen(embedded: true)
       : currentIndex == 3
       ? const ProfileScreen()
         : SingleChildScrollView(
@@ -6576,6 +6791,172 @@ class _BookAppointmentScreenState
   String? selectedTime;
 
   // ============================================================
+  // FREE SLOTS (loaded from the server)
+  // ============================================================
+
+  // The free slots of the chosen doctor on the chosen date
+  List<String> freeSlots = [];
+
+  // True while the slots are being loaded
+  bool loadingSlots = false;
+
+  // True if the last load failed (a Retry button is shown)
+  bool slotsFailed = false;
+
+  // A message from the server, for example "The doctor does not work on this day."
+  String slotsMessage = '';
+
+  // Which doctor and date the list above belongs to (like "3|2026-10-27")
+  String? slotsKey;
+
+  // What the patient typed as the reason for the visit (can stay empty)
+  String reasonText = '';
+
+  // The doctor and date the patient has chosen right now.
+  // Returns null if the doctors have not been loaded yet.
+  String? _wantedSlotsKey() {
+    if (doctors.isEmpty || selectedDoctor >= doctors.length) return null;
+
+    final doctorId = int.tryParse(
+      doctors[selectedDoctor]['doctor_id']?.toString() ?? '',
+    );
+
+    if (doctorId == null) return null;
+
+    final date =
+        '${selectedDate.year.toString().padLeft(4, '0')}-'
+        '${selectedDate.month.toString().padLeft(2, '0')}-'
+        '${selectedDate.day.toString().padLeft(2, '0')}';
+
+    return '$doctorId|$date';
+  }
+
+  // Asks the server for the free slots of the chosen doctor and date
+  Future<void> loadFreeSlots() async {
+    final key = _wantedSlotsKey();
+
+    // Nothing to load, or this doctor and date are already loaded
+    if (key == null || key == slotsKey) return;
+
+    final parts = key.split('|');
+
+    setState(() {
+      slotsKey = key;
+      loadingSlots = true;
+      slotsFailed = false;
+      slotsMessage = '';
+      freeSlots = [];
+      selectedTime = null; // The old choice may not be free any more
+    });
+
+    // Ask the server (function we added in api_service.dart)
+    final result = await ApiService.getFreeSlots(
+      doctorId: int.parse(parts[0]),
+      date: parts[1],
+    );
+
+    // Stop if the screen closed, or the patient already chose
+    // another doctor or date while we were waiting
+    if (!mounted || slotsKey != key) return;
+
+    setState(() {
+      freeSlots = List<String>.from(result['slots'] ?? []);
+      slotsMessage = (result['message'] ?? '').toString();
+      slotsFailed = result['success'] != true;
+      loadingSlots = false;
+    });
+  }
+
+  // "09:30 AM" -> 9, "01:00 PM" -> 13 (the hour on a 24-hour clock)
+  int _hour24(String label) {
+    final parts = label.split(' ');
+    var hour = int.parse(parts[0].split(':')[0]);
+    final isPm = parts[1] == 'PM';
+
+    if (isPm && hour != 12) hour += 12;
+    if (!isPm && hour == 12) hour = 0;
+
+    return hour;
+  }
+
+  // The free slots that start between two hours of the day
+  List<String> _slotsBetween(int fromHour, int toHour) {
+    return freeSlots.where((label) {
+      final hour = _hour24(label);
+      return hour >= fromHour && hour < toHour;
+    }).toList();
+  }
+
+  // The three groups the screen shows (now built from the free slots)
+  List<String> get morningSlots => _slotsBetween(0, 12);
+  List<String> get afternoonSlots => _slotsBetween(12, 17);
+  List<String> get eveningSlots => _slotsBetween(17, 24);
+
+  // Shows a spinner or a message above the slots, and starts loading
+  // them when the doctor or date has changed.
+  Widget _slotsStatus() {
+    final wantedKey = _wantedSlotsKey();
+
+    // The doctor or date changed: load the new slots after this frame
+    if (wantedKey != null && wantedKey != slotsKey && !loadingSlots) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) loadFreeSlots();
+      });
+    }
+
+    // Still loading (or about to)
+    if (loadingSlots || (wantedKey != null && wantedKey != slotsKey)) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Loaded, but there is nothing to choose from
+    if (wantedKey != null && freeSlots.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF4E0),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.event_busy, size: 40, color: Colors.orange),
+            const SizedBox(height: 8),
+            Text(
+              slotsFailed
+                  ? 'Could not load the time slots. $slotsMessage'
+                  : (slotsMessage.isEmpty
+                      ? 'No free slots on this date.'
+                      : slotsMessage),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Please choose another date or doctor.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            if (slotsFailed)
+              TextButton.icon(
+                onPressed: () {
+                  slotsKey = null; // Forget the failed load
+                  loadFreeSlots();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  // ============================================================
   // SPECIALTIES
   // ============================================================
 final List<Map<String, dynamic>> specialties = [
@@ -6668,7 +7049,7 @@ Future<void> loadDoctors() async {
   // TIME SLOTS
   // ============================================================
 
-  final List<String> morningSlots = [
+  final List<String> oldMorningSlots = [
     '09:00 AM',
     '09:30 AM',
     '10:00 AM',
@@ -6677,7 +7058,7 @@ Future<void> loadDoctors() async {
     '11:30 AM',
   ];
 
-  final List<String> afternoonSlots = [
+  final List<String> oldAfternoonSlots = [
     '01:00 PM',
     '01:30 PM',
     '02:00 PM',
@@ -6686,7 +7067,7 @@ Future<void> loadDoctors() async {
     '03:30 PM',
   ];
 
-  final List<String> eveningSlots = [
+  final List<String> oldEveningSlots = [
     '05:00 PM',
     '05:30 PM',
     '06:00 PM',
@@ -8453,6 +8834,9 @@ Future<void> loadDoctors() async {
           const SizedBox(height: 28),
 
           // ====================================================
+          // The spinner, or the message when there are no free slots
+          _slotsStatus(),
+
           // MORNING
           // ====================================================
 
@@ -8496,6 +8880,46 @@ Future<void> loadDoctors() async {
           ),
 
           const SizedBox(height: 35),
+
+          
+          // Optional: why the patient wants to see the doctor.
+          // It can be left empty.
+          const Text(
+            'Reason for visit (optional)',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF26384A),
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          const Text(
+            'You can skip this. The doctor will ask you during the consultation.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+
+          const SizedBox(height: 10),
+
+          TextField(
+            // Keep what the patient types
+            onChanged: (value) => reasonText = value,
+            maxLines: 2,
+            maxLength: 200,
+            decoration: InputDecoration(
+              hintText: 'For example: fever for two days',
+              prefixIcon: const Icon(Icons.edit_note),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
 
           // ====================================================
           // CONFIRM BUTTON
@@ -8559,6 +8983,8 @@ Future<void> loadDoctors() async {
     String title,
     List<String> slots,
   ) {
+    // Hide the group (title and all) when it has no free slots
+    if (slots.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment:
           CrossAxisAlignment.start,
@@ -8763,13 +9189,19 @@ Future<void> _confirmAppointment() async {
     startTime: startTime,
     endTime: endTime,
     consultationMode: 'Online',
-    reasonForVisit: null,
+    // An empty box is sent as "no reason"
+    reasonForVisit: reasonText.trim().isEmpty ? null : reasonText.trim(),
   );
 
   if (!mounted) return;
 
   // Booking failed
   if (result['success'] != true) {
+    // Someone may have taken the time: load the free slots again
+    setState(() {
+      slotsKey = null;
+      selectedTime = null;
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -8816,10 +9248,8 @@ Future<void> _confirmAppointment() async {
 
             Expanded(
               child: Text(
-                tr(
-                  'Appointment Confirmed',
-                  selectedLanguage,
-                ),
+                // The booking is not confirmed until the doctor accepts it
+                'Request Sent to Doctor',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -9000,8 +9430,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       final appointmentDateTime =
           DateTime.parse('$date $time');
 
+      // Bookings waiting for the doctor (Pending) show here too,
+      // with their own label on the card
       return appointmentDateTime.isAfter(now) &&
-          status == 'Scheduled';
+          (status == 'Scheduled' || status == 'Pending');
     } catch (e) {
       return false;
     }
@@ -9019,8 +9451,12 @@ List<Map<String, dynamic>> get pastAppointments {
       final appointmentDateTime =
           DateTime.parse('$date $time');
 
-      return !appointmentDateTime.isAfter(now) &&
-    appointment['status'].toString() != 'Cancelled';
+      final status = appointment['status'].toString();
+
+      // Rejected bookings go to "Past" right away, even if their time
+      // has not come yet, so they never disappear
+      return (!appointmentDateTime.isAfter(now) && status != 'Cancelled') ||
+          status == 'Rejected';
     } catch (e) {
       return false;
     }
@@ -9935,14 +10371,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
     loadPatientName();
   }
 
+ 
+  // Loads the patient's name from the backend database
+  // instead of relying on an old name saved locally.
   Future<void> loadPatientName() async {
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      // Read the patient ID saved during registration.
+      final prefs = await SharedPreferences.getInstance();
+      final patientId = prefs.getInt('patientId');
 
-    setState(() {
-      patientName = prefs.getString('patientName') ?? 'My Account';
-    });
+      // If there is no saved patient ID, show the fallback name.
+      if (patientId == null) {
+        if (!mounted) return;
+
+        setState(() {
+          patientName = 'My Account';
+        });
+        return;
+      }
+
+      // Retrieve the latest patient record from the database.
+      final result = await ApiService.getPatientDetails(
+        patientId: patientId,
+      );
+
+      // Avoid updating the screen if it has already been closed.
+      if (!mounted) return;
+
+      if (result['success'] == true) {
+        // Get the patient's name from the backend response.
+        final patient = result['patient'] as Map<String, dynamic>;
+        final name = patient['full_name']?.toString().trim();
+
+        setState(() {
+          // Use the database name, with a fallback if it is empty.
+          patientName =
+              (name != null && name.isNotEmpty) ? name : 'My Account';
+        });
+      } else {
+        // Keep a readable fallback if the database request fails.
+        setState(() {
+          patientName = 'My Account';
+        });
+
+        debugPrint(
+          'Unable to load patient name: ${result['message']}',
+        );
+      }
+    } catch (e) {
+      // Log unexpected errors without crashing the Profile screen.
+      debugPrint('Error loading patient name: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        patientName = 'My Account';
+      });
+    }
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -10091,14 +10578,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subtitle: tr('Personal information', selectedLanguage),
                     iconColor: Colors.blue,
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                         SnackBar(
-                          content: Text(
-                            tr('My Details will be available here.', selectedLanguage),
+                         Navigator.push(
+                          context,
+                             MaterialPageRoute(
+                              builder: (context) => const PatientDetailsScreen(),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                     },
                   ),
                 ),
 
@@ -10110,15 +10596,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: tr('Emergency', selectedLanguage),
                     subtitle: tr('Emergency contact', selectedLanguage),
                     iconColor: Colors.red,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                         SnackBar(
-                          content: Text(
-                            tr('Emergency Contact will be available here.', selectedLanguage),
-                          ),
-                        ),
+                    
+                       onTap: () {
+                        // Navigate to the Emergency screen when the patient taps the card.
+                        Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                        builder: (context) => const EmergencyScreen(),
+                         ),
                       );
                     },
+
                   ),
                 ),
               ],
@@ -10135,12 +10623,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: tr('Language', selectedLanguage),
                     subtitle: tr('Choose language', selectedLanguage),
                     iconColor: Colors.orange,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                         SnackBar(
-                          content: Text(
-                            tr('Language settings will be available here.', selectedLanguage),
-                          ),
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChooseLanguage(),
                         ),
                       );
                     },
@@ -18699,7 +19186,10 @@ class DoctorDashboardScreen extends StatelessWidget {
                 Navigator.push(
                  context,
                  MaterialPageRoute(
-                  builder: (context) => const DoctorAvailabilityScreen(),
+                  builder: (context) => DoctorAvailabilityScreen(
+                    // The dashboard already knows which doctor is logged in
+                    doctorId: doctorId,
+                  ),
                  ),
                );
              },
@@ -18783,12 +19273,15 @@ class DoctorDashboardScreen extends StatelessWidget {
               subtitle:
                   'View patient medical history and health information.',
               iconColor: Colors.orange,
-             onTap: () {
-                 Navigator.push(
-                   context,
+              onTap: () {
+                // Open the doctor's real patient list.
+                // "doctorId" is a value the dashboard already has.
+                Navigator.push(
+                  context,
                   MaterialPageRoute(
-                    builder: (context) =>
-                   const DoctorPatientRecordsScreen(),
+                    builder: (context) => DoctorPatientsScreen(
+                      doctorId: doctorId,
+                    ),
                   ),
                 );
               },
@@ -18852,7 +19345,13 @@ class DoctorDashboardScreen extends StatelessWidget {
 // ============================================================
 
 class DoctorAvailabilityScreen extends StatefulWidget {
-  const DoctorAvailabilityScreen({super.key});
+  // The doctor whose schedule is shown and saved
+  final int doctorId;
+
+  const DoctorAvailabilityScreen({
+    super.key,
+    required this.doctorId,
+  });
 
   @override
   State<DoctorAvailabilityScreen> createState() =>
@@ -18887,6 +19386,101 @@ class _DoctorAvailabilityScreenState
   String slotDuration = '30 minutes';
 
   final List<DateTime> unavailableDates = [];
+
+  // True while the saved schedule is being loaded
+  bool loadingSchedule = true;
+
+  // True while the schedule is being sent to the server
+  bool savingSchedule = false;
+
+  // initState runs once, when the screen first opens
+  @override
+  void initState() {
+    super.initState();
+    loadSchedule(); // Start loading right away
+  }
+
+  // Small helpers that turn values into the text the server uses
+  String twoDigits(int number) => number.toString().padLeft(2, '0');
+
+  // TimeOfDay -> "09:30"
+  String timeToText(TimeOfDay time) =>
+      '${twoDigits(time.hour)}:${twoDigits(time.minute)}';
+
+  // "09:30" -> TimeOfDay
+  TimeOfDay textToTime(String text) {
+    final parts = text.split(':');
+    return TimeOfDay(
+      hour: int.parse(parts[0]),
+      minute: int.parse(parts[1]),
+    );
+  }
+
+  // DateTime -> "2026-12-25"
+  String dateToText(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${twoDigits(date.month)}-${twoDigits(date.day)}';
+
+  // Loads the doctor's saved schedule from the server.
+  // If nothing is saved yet, the screen keeps its default values.
+  Future<void> loadSchedule() async {
+    try {
+      // Ask the server (function we added in api_service.dart)
+      final data = await ApiService.getDoctorSchedule(widget.doctorId);
+
+      // If the doctor left this screen while waiting, stop here
+      if (!mounted) return;
+
+      final schedule = data?['schedule'] as Map<String, dynamic>?;
+
+      setState(() {
+        // The "available for consultations" switch
+        isAvailable = data?['is_available'] != false;
+
+        if (schedule != null) {
+          // Working days: numbers 1..7 -> day names
+          final workingDays = List<int>.from(schedule['working_days']);
+          selectedDays
+            ..clear()
+            ..addAll(workingDays.map((number) => days[number - 1]));
+
+          startTime = textToTime(schedule['start_time'].toString());
+          endTime = textToTime(schedule['end_time'].toString());
+
+          // Only the lengths in the dropdown are allowed
+          final saved = '${schedule['slot_minutes']} minutes';
+          slotDuration = const [
+            '15 minutes',
+            '30 minutes',
+            '45 minutes',
+            '60 minutes',
+          ].contains(saved)
+              ? saved
+              : '30 minutes';
+
+          unavailableDates
+            ..clear()
+            ..addAll(
+              List<String>.from(schedule['days_off']).map(DateTime.parse),
+            );
+        }
+
+        loadingSchedule = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        loadingSchedule = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
 
   Future<void> selectStartTime() async {
     final TimeOfDay? picked = await showTimePicker(
@@ -18946,7 +19540,79 @@ class _DoctorAvailabilityScreenState
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  void saveAvailability() {
+  // Sends the schedule to the server
+  Future<void> saveAvailability() async {
+    // Ignore taps while loading or while a save is already running
+    if (loadingSchedule || savingSchedule) return;
+
+    if (isAvailable && selectedDays.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one working day.'),
+        ),
+      );
+      return;
+    }
+
+    // The end time must come after the start time
+    final startMinutes = startTime.hour * 60 + startTime.minute;
+    final endMinutes = endTime.hour * 60 + endTime.minute;
+
+    if (endMinutes <= startMinutes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The end time must be after the start time.'),
+        ),
+      );
+      return;
+    }
+
+    // Day names -> numbers 1..7 (Monday = 1). If the switch is off and
+    // no day is chosen, we still send Monday to Friday.
+    final dayNumbers = selectedDays.isEmpty
+        ? [1, 2, 3, 4, 5]
+        : (selectedDays.map((name) => days.indexOf(name) + 1).toList()
+          ..sort());
+
+    // "30 minutes" -> 30
+    final minutes = int.parse(slotDuration.split(' ').first);
+
+    setState(() {
+      savingSchedule = true;
+    });
+
+    final result = await ApiService.saveDoctorSchedule(
+      doctorId: widget.doctorId,
+      workingDays: dayNumbers,
+      startTime: timeToText(startTime),
+      endTime: timeToText(endTime),
+      slotMinutes: minutes,
+      daysOff: unavailableDates.map(dateToText).toList(),
+      isAvailable: isAvailable,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      savingSchedule = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['success'] == true
+              ? 'Doctor availability saved successfully.'
+              : (result['message'] ?? 'Failed to save the schedule.')
+                  .toString(),
+        ),
+        backgroundColor:
+            result['success'] == true ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
+  // (old version, no longer used)
+  void oldSaveAvailability() {
     if (isAvailable && selectedDays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -19787,6 +20453,75 @@ Widget appointmentDetailRow(
   );
 }
 
+// The doctor accepts or rejects a booking that is waiting (Pending).
+// The server tells the patient with a notification.
+Future<void> answerAppointment(
+  Map<String, dynamic> appointment,
+  bool accept, // true = accept, false = reject
+) async {
+  final appointmentId = appointment['appointment_id'] as int;
+
+  // Rejecting cannot be undone, so ask first
+  if (!accept) {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Reject this booking?'),
+          content: const Text(
+            'The patient will be told that you could not accept it.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Reject'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // The doctor tapped Cancel (or closed the popup)
+    if (confirmed != true) return;
+  }
+
+  // Send the answer to the server (function in api_service.dart)
+  final result = await ApiService.respondToAppointment(
+    doctorId: widget.doctorId,
+    appointmentId: appointmentId,
+    accept: accept,
+  );
+
+  if (!mounted) return;
+
+  if (result['success'] == true) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          accept ? 'Appointment accepted.' : 'Appointment rejected.',
+        ),
+        backgroundColor: accept ? Colors.green : Colors.red,
+      ),
+    );
+
+    // Reload the list so the card shows its new status
+    await loadAppointments();
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result['message'] ?? 'Failed to answer the appointment.',
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+
 Future<void> completeAppointment(
   Map<String, dynamic> appointment,
 ) async {
@@ -19948,6 +20683,46 @@ void joinDoctorVideoConsultation(
             const SizedBox(height: 16),
 
             const Divider(),
+
+// Pending bookings wait for the doctor's decision
+if (status == 'Pending') ...[
+  const SizedBox(height: 12),
+
+  Row(
+    children: [
+      Expanded(
+        child: OutlinedButton.icon(
+          onPressed: () => answerAppointment(appointment, false),
+          icon: const Icon(Icons.close),
+          label: const Text('Reject'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.red,
+            minimumSize: const Size(0, 46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: ElevatedButton.icon(
+          onPressed: () => answerAppointment(appointment, true),
+          icon: const Icon(Icons.check),
+          label: const Text('Accept'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(0, 46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+],
 
 if (status == 'Scheduled') ...[
   const SizedBox(height: 12),

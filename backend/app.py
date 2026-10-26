@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask,request,jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import psycopg2
 from werkzeug.utils import secure_filename
@@ -8,6 +8,11 @@ from werkzeug.security import generate_password_hash
 import joblib
 import time
 import re
+import uuid
+import threading
+import datetime as dt
+import firebase_admin
+from firebase_admin import credentials, messaging
 from agora_token_builder import RtcTokenBuilder
 
 load_dotenv()
@@ -23,6 +28,31 @@ print("Agora configuration variables set:",
 
 app = Flask(__name__)
 CORS(app)
+
+# ============================================================
+# FIREBASE (sends push notifications to phones)
+# The key file location comes from the .env file.
+# If anything is wrong, the server still starts, it just cannot
+# send push notifications.
+# ============================================================
+firebase_ready = False
+
+try:
+    key_path = os.getenv("FIREBASE_KEY_PATH")
+
+    if key_path:
+        # Look for the key file in the same folder as app.py
+        key_full_path = os.path.join(os.path.dirname(__file__), key_path)
+
+        firebase_admin.initialize_app(
+            credentials.Certificate(key_full_path)
+        )
+        firebase_ready = True
+
+except Exception as firebase_error:
+    print("Firebase setup failed:", firebase_error)
+
+print("Firebase ready:", firebase_ready)
 model = joblib.load(os.path.join(os.path.dirname(__file__), "triage_model.pkl"))
 DATABASE_URL = (
     f"dbname={os.getenv('DB_NAME')} "
@@ -239,7 +269,168 @@ def check_patient_phone():
         return jsonify({
             "status": "error",
             "message": "Unable to check patient account."
-        }), 500        
+        }), 500  
+
+
+# ============================================================
+# GET PATIENT DETAILS
+# Retrieves a patient's complete profile from the database
+# using the patient_id saved during registration.
+# ============================================================
+
+@app.route("/api/patients/<int:patient_id>", methods=["GET"])
+def get_patient_details(patient_id):
+    conn = None
+
+    try:
+        # Connect to the database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Combine the users and patients tables because
+        # personal information is stored in both tables.
+        cursor.execute("""
+            SELECT
+                p.patient_id,
+                u.user_id,
+                u.full_name,
+                u.phone,
+                p.date_of_birth,
+                p.gender,
+                p.address,
+                p.emergency_contact_name,
+                p.emergency_contact_phone
+            FROM patients p
+            JOIN users u ON u.user_id = p.user_id
+            WHERE p.patient_id = %s
+              AND u.role_id = 2
+            LIMIT 1
+        """, (patient_id,))
+
+        # Fetch the matching patient's record
+        patient = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+        conn = None
+
+        # Return 404 if the patient ID does not exist
+        if patient is None:
+            return jsonify({
+                "status": "error",
+                "message": "Patient not found"
+            }), 404
+
+        # Return the database values as JSON for Flutter
+        return jsonify({
+            "status": "success",
+            "patient": {
+                "patient_id": patient[0],
+                "user_id": patient[1],
+                "full_name": patient[2],
+                "phone": patient[3],
+                "date_of_birth": (
+                    patient[4].isoformat()
+                    if patient[4] is not None
+                    and hasattr(patient[4], "isoformat")
+                    else patient[4]
+                ),
+                "gender": patient[5],
+                "address": patient[6],
+                "emergency_contact_name": patient[7],
+                "emergency_contact_phone": patient[8]
+            }
+        }), 200
+
+    except Exception as e:
+        # Close the connection if an error occurs
+        if conn is not None:
+            conn.close()
+
+        print("Get patient details error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Unable to retrieve patient details"
+        }), 500
+
+  
+# ============================================================
+# UPDATE PATIENT EMERGENCY CONTACT
+# Saves emergency contact changes to the database.
+# ============================================================
+@app.route("/api/patients/<int:patient_id>/emergency-contact", methods=["PUT"])
+def update_emergency_contact(patient_id):
+    conn = None
+
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "Request data is required"
+            }), 400
+
+        contact_name = (data.get("emergency_contact_name") or "").strip()
+        contact_phone = (data.get("emergency_contact_phone") or "").strip()
+
+        if not contact_name or not contact_phone:
+            return jsonify({
+                "status": "error",
+                "message": "Emergency contact name and phone are required"
+            }), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE patients
+            SET emergency_contact_name = %s,
+                emergency_contact_phone = %s
+            WHERE patient_id = %s
+            RETURNING patient_id
+        """, (contact_name, contact_phone, patient_id))
+
+        updated_patient = cursor.fetchone()
+
+        if updated_patient is None:
+            conn.rollback()
+            cursor.close()
+            conn.close()
+            conn = None
+
+            return jsonify({
+                "status": "error",
+                "message": "Patient not found"
+            }), 404
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        conn = None
+
+        return jsonify({
+            "status": "success",
+            "message": "Emergency contact updated successfully",
+            "patient_id": patient_id,
+            "emergency_contact_name": contact_name,
+            "emergency_contact_phone": contact_phone
+        }), 200
+
+    except Exception as e:
+        if conn is not None:
+            conn.rollback()
+            conn.close()
+
+        print("Update emergency contact error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Unable to update emergency contact"
+        }), 500
+      
+
  # ============================================================
 # TRIAGE CLASSIFICATION
 # ============================================================
@@ -724,6 +915,37 @@ def create_appointment():
             }), 404
 
         # -----------------------------------
+        # Check that the doctor is free at this time.
+        # Two bookings overlap when one starts before the other ends.
+        # Cancelled and Rejected bookings do not block a time.
+        # -----------------------------------
+
+        # Lock this doctor's bookings while we check and save, so two
+        # patients cannot take the same time at the same moment.
+        # (The lock is released automatically at the end of the request.)
+        cursor.execute("SELECT pg_advisory_xact_lock(%s)", (doctor_id,))
+
+        cursor.execute("""
+            SELECT 1
+            FROM appointments
+            WHERE doctor_id = %s
+              AND appointment_date = %s
+              AND status IN ('Pending', 'Scheduled')
+              AND start_time < %s::time
+              AND COALESCE(
+                    end_time,
+                    start_time + INTERVAL '30 minutes'
+                  ) > %s::time
+            LIMIT 1
+        """, (doctor_id, appointment_date, end_time, start_time))
+
+        if cursor.fetchone():
+            return jsonify({
+                "status": "error",
+                "message": "This time is already booked. Please choose another time."
+            }), 409
+
+        # -----------------------------------
         # Create appointment
         # -----------------------------------
         cursor.execute(
@@ -765,12 +987,69 @@ def create_appointment():
 
         appointment_id = cursor.fetchone()[0]
 
+        # A new booking waits for the doctor's decision (Pending).
+        # This runs in the same transaction as the booking above.
+        cursor.execute("""
+            UPDATE appointments
+            SET status = 'Pending'
+            WHERE appointment_id = %s
+        """, (appointment_id,))
+
         conn.commit()
 
         print(
             "APPOINTMENT CREATED. Appointment ID =",
             appointment_id
         )
+
+        # ----- Tell the doctor about the new request. A problem here
+        # must never undo the booking, so it has its own try/except. -----
+        try:
+            cursor.execute("""
+                SELECT du.user_id, pu.full_name
+                FROM doctors d
+                JOIN users du
+                    ON d.user_id = du.user_id
+                CROSS JOIN patients p
+                JOIN users pu
+                    ON p.user_id = pu.user_id
+                WHERE d.doctor_id = %s
+                  AND p.patient_id = %s
+            """, (doctor_id, patient_id))
+
+            info = cursor.fetchone()
+
+            if info:
+                doctor_user_id = info[0]
+                patient_name = info[1]
+
+                when = f"{appointment_date} at {str(start_time)[:5]}"
+                title = "New appointment request"
+                message = f"{patient_name} requested an appointment on {when}."
+
+                # Save the notice (for the Alerts list)
+                cursor.execute("""
+                    INSERT INTO notifications
+                        (user_id, title, message, type, appointment_id)
+                    VALUES (%s, %s, %s, 'AppointmentRequest', %s)
+                """, (doctor_user_id, title, message, appointment_id))
+
+                conn.commit()
+
+                # Send the push notification to the doctor's phone(s)
+                send_push_to_user(
+                    doctor_user_id,
+                    title,
+                    message,
+                    {
+                        "type": "AppointmentRequest",
+                        "appointment_id": str(appointment_id)
+                    }
+                )
+
+        except Exception as notice_error:
+            conn.rollback()
+            print("Booking notice error:", notice_error)
 
         return jsonify({
             "status": "success",
@@ -924,6 +1203,60 @@ def cancel_appointment(appointment_id):
         conn.commit()
 
         print("APPOINTMENT CANCELLED. Appointment ID =", appointment_id)
+
+        # ----- Tell the doctor. Only for bookings the doctor knew about
+        # (Pending or Scheduled). A problem here must never undo the
+        # cancellation, so it has its own try/except. -----
+        if current_status in ("Pending", "Scheduled"):
+            try:
+                cursor.execute("""
+                    SELECT du.user_id, pu.full_name,
+                           a.appointment_date, a.start_time
+                    FROM appointments a
+                    JOIN doctors d
+                        ON a.doctor_id = d.doctor_id
+                    JOIN users du
+                        ON d.user_id = du.user_id
+                    JOIN patients p
+                        ON a.patient_id = p.patient_id
+                    JOIN users pu
+                        ON p.user_id = pu.user_id
+                    WHERE a.appointment_id = %s
+                """, (appointment_id,))
+
+                info = cursor.fetchone()
+
+                if info:
+                    doctor_user_id = info[0]
+                    patient_name = info[1]
+                    when = f"{info[2]} at {str(info[3])[:5]}"
+
+                    title = "Appointment cancelled"
+                    message = f"{patient_name} cancelled the appointment on {when}."
+
+                    # Save the notice (for the Alerts list)
+                    cursor.execute("""
+                        INSERT INTO notifications
+                            (user_id, title, message, type, appointment_id)
+                        VALUES (%s, %s, %s, 'AppointmentCancelled', %s)
+                    """, (doctor_user_id, title, message, appointment_id))
+
+                    conn.commit()
+
+                    # Send the push notification to the doctor's phone(s)
+                    send_push_to_user(
+                        doctor_user_id,
+                        title,
+                        message,
+                        {
+                            "type": "AppointmentCancelled",
+                            "appointment_id": str(appointment_id)
+                        }
+                    )
+
+            except Exception as notice_error:
+                conn.rollback()
+                print("Cancel notice error:", notice_error)
 
         return jsonify({
             "status": "success",
@@ -1730,7 +2063,73 @@ def generate_video_token(appointment_id):
                 "message": "This appointment is not available for a video call"
             }), 400
 
-        # Create the same channel for both participants
+         # When the DOCTOR joins, leave a notice for the patient.
+        # A problem here must never stop the video call, so it has
+        # its own try/except.
+        if participant_role == "doctor":
+            try:
+                # Find the patient's user ID and the doctor's name
+                cursor.execute("""
+                    SELECT p.user_id, du.full_name
+                    FROM patients p
+                    CROSS JOIN doctors d
+                    JOIN users du
+                        ON d.user_id = du.user_id
+                    WHERE p.patient_id = %s
+                      AND d.doctor_id = %s
+                """, (patient_id, doctor_id))
+
+                notice_info = cursor.fetchone()
+
+                if notice_info:
+                    patient_user_id = notice_info[0]
+                    doctor_name = notice_info[1]
+
+                    # Skip it if the patient already has an unread notice
+                    # for this appointment (for example after "Try Again")
+                    cursor.execute("""
+                        SELECT 1
+                        FROM notifications
+                        WHERE user_id = %s
+                          AND appointment_id = %s
+                          AND type = 'ConsultationStarted'
+                          AND is_read = 'N'
+                        LIMIT 1
+                    """, (patient_user_id, appointment_id))
+
+                    if not cursor.fetchone():
+                        cursor.execute("""
+                            INSERT INTO notifications
+                                (user_id, title, message, type, appointment_id)
+                            VALUES (%s, %s, %s, 'ConsultationStarted', %s)
+                        """, (
+                            patient_user_id,
+                            "Your doctor is ready",
+                            f"{doctor_name} has started your consultation. "
+                            "Tap Join to start the video call.",
+                            appointment_id
+                        ))
+
+                        conn.commit()
+
+                        # Also send a real push notification to the
+                        # patient's phone(s)
+                        send_push_to_user(
+                            patient_user_id,
+                            "Your doctor is ready",
+                            f"{doctor_name} has started your consultation. Tap to join.",
+                            {
+                                "type": "ConsultationStarted",
+                                "appointment_id": str(appointment_id)
+                            }
+                        )
+
+            except Exception as notice_error:
+                # Forget the failed notice and carry on with the call
+                conn.rollback()
+                print("Consultation notice error:", notice_error)
+
+        # Create the same channel for both participants  
         channel_name = f"rural_appt_{appointment_id}"
 
         # Give patient and doctor different Agora UIDs
@@ -3040,7 +3439,1391 @@ def get_patient_record_for_doctor(doctor_id, patient_id):
 
         if conn:
             conn.close()
-            
+
+# ============================================================
+# MEDICAL REPORTS (lab results, scans)
+# The file is saved in the server's "uploads/reports" folder.
+# The database stores only the saved file name.
+# ============================================================
+
+# Only these kinds of file are accepted
+ALLOWED_REPORT_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
+
+# The biggest upload we accept: 10 MB
+MAX_REPORT_BYTES = 10 * 1024 * 1024
+
+# The folder where report files are kept
+REPORTS_FOLDER = os.path.join(UPLOAD_FOLDER, "reports")
+
+
+# ----- Upload a report -----
+@app.route("/api/patients/<int:patient_id>/reports", methods=["POST"])
+def upload_report(patient_id):
+    # The text fields that come with the file
+    report_type = request.form.get("report_type")
+    description = (request.form.get("description") or "").strip()
+    report_date = request.form.get("report_date")  # Optional
+
+    # The file itself
+    file = request.files.get("file")
+
+    # Only the types allowed by the database
+    if report_type not in ["Lab", "Imaging", "Other"]:
+        return jsonify({
+            "status": "error",
+            "message": "Please choose a valid report type"
+        }), 400
+
+    if not description:
+        return jsonify({
+            "status": "error",
+            "message": "Please enter a title for the report"
+        }), 400
+
+    if not file or not file.filename:
+        return jsonify({
+            "status": "error",
+            "message": "Please choose a file"
+        }), 400
+
+    # Refuse files that are too big
+    if request.content_length and request.content_length > MAX_REPORT_BYTES:
+        return jsonify({
+            "status": "error",
+            "message": "The file is too big. The limit is 10 MB."
+        }), 400
+
+    # Check the file type from its name
+    extension = os.path.splitext(secure_filename(file.filename))[1].lower()
+
+    if extension not in ALLOWED_REPORT_EXTENSIONS:
+        return jsonify({
+            "status": "error",
+            "message": "Only PDF, JPG and PNG files are allowed"
+        }), 400
+
+    conn = None
+    cursor = None
+    saved_path = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The patient must exist
+        cursor.execute(
+            "SELECT patient_id FROM patients WHERE patient_id = %s",
+            (patient_id,)
+        )
+
+        if not cursor.fetchone():
+            return jsonify({
+                "status": "error",
+                "message": "Patient not found"
+            }), 404
+
+        # Save the file under a new random name, so two files with
+        # the same name can never overwrite each other
+        os.makedirs(REPORTS_FOLDER, exist_ok=True)
+        stored_name = f"patient{patient_id}_{uuid.uuid4().hex}{extension}"
+        saved_path = os.path.join(REPORTS_FOLDER, stored_name)
+        file.save(saved_path)
+
+        # Save the details in the database
+        cursor.execute("""
+            INSERT INTO medical_reports
+                (patient_id, report_type, file_url, report_date, description)
+            VALUES (%s, %s, %s, COALESCE(%s, CURRENT_DATE), %s)
+            RETURNING report_id
+        """, (
+            patient_id,
+            report_type,
+            stored_name,
+            report_date if report_date else None,
+            description
+        ))
+
+        report_id = cursor.fetchone()[0]
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Report uploaded successfully",
+            "report_id": report_id
+        }), 201
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        # If the database failed, remove the file we just saved
+        if saved_path and os.path.exists(saved_path):
+            os.remove(saved_path)
+
+        print("Upload Report Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to upload the report"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- List a patient's reports -----
+@app.route("/api/patients/<int:patient_id>/reports", methods=["GET"])
+def get_patient_reports(patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                report_id,
+                report_type,
+                description,
+                report_date,
+                file_url
+            FROM medical_reports
+            WHERE patient_id = %s
+            ORDER BY uploaded_at DESC, report_id DESC
+        """, (patient_id,))
+
+        reports = []
+
+        for row in cursor.fetchall():
+            # The app needs to know whether the file is a PDF or a picture
+            extension = os.path.splitext(row[4])[1].lower()
+
+            reports.append({
+                "report_id": row[0],
+                "report_type": row[1],
+                "description": row[2],
+                "report_date": str(row[3]) if row[3] else None,
+                "file_kind": "pdf" if extension == ".pdf" else "image"
+            })
+
+        return jsonify({
+            "status": "success",
+            "reports": reports
+        }), 200
+
+    except Exception as e:
+        print("Get Reports Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load reports"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ----- Open a report's file (PDF or picture) -----
+@app.route(
+    "/api/patients/<int:patient_id>/reports/<int:report_id>/file",
+    methods=["GET"]
+)
+def get_report_file(patient_id, report_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The report must belong to this patient
+        cursor.execute("""
+            SELECT file_url
+            FROM medical_reports
+            WHERE report_id = %s
+              AND patient_id = %s
+        """, (report_id, patient_id))
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Report not found"
+            }), 404
+
+        # Send the saved file back to the app
+        return send_from_directory(
+            os.path.abspath(REPORTS_FOLDER),
+            row[0]
+        )
+
+    except Exception as e:
+        print("Get Report File Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to open the report"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- Delete a report (the database row and the file) -----
+@app.route(
+    "/api/patients/<int:patient_id>/reports/<int:report_id>",
+    methods=["DELETE"]
+)
+def delete_report(patient_id, report_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Delete the row, but only if it belongs to this patient.
+        # RETURNING gives us the file name so we can delete the file too.
+        cursor.execute("""
+            DELETE FROM medical_reports
+            WHERE report_id = %s
+              AND patient_id = %s
+            RETURNING file_url
+        """, (report_id, patient_id))
+
+        row = cursor.fetchone()
+
+        if not row:
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "Report not found"
+            }), 404
+
+        conn.commit()
+
+        # Remove the file from the folder (ignore it if it is already gone)
+        file_path = os.path.join(REPORTS_FOLDER, row[0])
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        return jsonify({
+            "status": "success",
+            "message": "Report deleted"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Delete Report Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to delete the report"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# PATIENT NOTIFICATIONS
+# The patient's app asks every few seconds whether the doctor
+# has started the consultation.
+# ============================================================
+
+# ----- Unread "consultation started" notices (last 30 minutes) -----
+@app.route("/api/patients/<int:patient_id>/notifications/pending", methods=["GET"])
+def get_pending_notifications(patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Only recent notices, so old ones never pop up later
+        cursor.execute("""
+            SELECT
+                n.notification_id,
+                n.title,
+                n.message,
+                n.type,
+                n.appointment_id
+            FROM notifications n
+            JOIN patients p
+                ON n.user_id = p.user_id
+            WHERE p.patient_id = %s
+              AND n.is_read = 'N'
+              AND n.type = 'ConsultationStarted'
+              AND n.created_at > CURRENT_TIMESTAMP - INTERVAL '30 minutes'
+            ORDER BY n.created_at DESC
+        """, (patient_id,))
+
+        notifications = []
+
+        for row in cursor.fetchall():
+            notifications.append({
+                "notification_id": row[0],
+                "title": row[1],
+                "message": row[2],
+                "type": row[3],
+                "appointment_id": row[4]
+            })
+
+        return jsonify({
+            "status": "success",
+            "notifications": notifications
+        }), 200
+
+    except Exception as e:
+        print("Get Notifications Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load notifications"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- Mark a notice as read -----
+@app.route(
+    "/api/patients/<int:patient_id>/notifications/<int:notification_id>/read",
+    methods=["PUT"]
+)
+def mark_notification_read(patient_id, notification_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Only the notice's owner can mark it as read
+        cursor.execute("""
+            UPDATE notifications
+            SET is_read = 'Y'
+            WHERE notification_id = %s
+              AND user_id = (
+                  SELECT user_id FROM patients WHERE patient_id = %s
+              )
+            RETURNING notification_id
+        """, (notification_id, patient_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "Notification not found"
+            }), 404
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Marked as read"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Mark Notification Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to update the notification"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# SAVE A PATIENT'S PHONE TOKEN
+# The app sends the phone's Firebase token after the patient
+# logs in, so the server knows where to send notifications.
+# ============================================================
+
+@app.route("/api/patients/<int:patient_id>/device-token", methods=["POST"])
+def save_patient_device_token(patient_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "status": "error",
+            "message": "No data received"
+        }), 400
+
+    token = (data.get("token") or "").strip()
+
+    # The token is a long piece of text. Reject empty or silly values.
+    if not token or len(token) > 4096:
+        return jsonify({
+            "status": "error",
+            "message": "A valid token is required"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Find the user that belongs to this patient
+        cursor.execute(
+            "SELECT user_id FROM patients WHERE patient_id = %s",
+            (patient_id,)
+        )
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Patient not found"
+            }), 404
+
+        user_id = row[0]
+
+        # Save the token. If this phone is already in the table,
+        # just update its owner and time (no duplicate rows).
+        cursor.execute("""
+            INSERT INTO device_tokens (user_id, token)
+            VALUES (%s, %s)
+            ON CONFLICT (token)
+            DO UPDATE SET
+                user_id = EXCLUDED.user_id,
+                updated_at = CURRENT_TIMESTAMP
+        """, (user_id, token))
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Token saved"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Save Device Token Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save the token"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# SEND A PUSH NOTIFICATION TO ONE USER
+# Sends the message to every phone saved for that user.
+# It never raises an error, so a notification problem can
+# never break the feature that called it.
+# ============================================================
+
+def send_push_to_user(user_id, title, body, data=None):
+    # Firebase must have started correctly (see the top of this file)
+    if not firebase_ready:
+        print("Push skipped: Firebase is not ready")
+        return
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # All the phones this user has logged in on
+        cursor.execute(
+            "SELECT token FROM device_tokens WHERE user_id = %s",
+            (user_id,)
+        )
+
+        tokens = [row[0] for row in cursor.fetchall()]
+
+        if not tokens:
+            print("Push skipped: no phone token saved for user", user_id)
+            return
+
+        for token in tokens:
+            try:
+                message = messaging.Message(
+                    token=token,
+                    # The text the patient sees on the lock screen
+                    notification=messaging.Notification(
+                        title=title,
+                        body=body
+                    ),
+                    # Extra values the app reads when the patient taps it
+                    # (values must be text)
+                    data=data or {},
+                    android=messaging.AndroidConfig(
+                        priority="high",
+                        notification=messaging.AndroidNotification(
+                            channel_id="consultation_alerts",
+                            sound="default"
+                        )
+                    )
+                )
+
+                messaging.send(message)
+                print("Push sent to one phone of user", user_id)
+
+            except Exception as send_error:
+                # A token of an uninstalled app or a logged-out phone stops
+                # working. Remove such tokens so we do not keep trying.
+                error_name = type(send_error).__name__
+
+                if error_name in ("UnregisteredError", "SenderIdMismatchError"):
+                    cursor.execute(
+                        "DELETE FROM device_tokens WHERE token = %s",
+                        (token,)
+                    )
+                    conn.commit()
+                    print("Removed an expired phone token")
+                else:
+                    print("Push send error:", send_error)
+
+    except Exception as e:
+        print("Push error:", e)
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()            
+
+# ============================================================
+# SAVE A DOCTOR'S PHONE TOKEN
+# Same idea as the patient route: the doctor's app sends the
+# phone's Firebase token so the server can send notifications.
+# ============================================================
+
+@app.route("/api/doctors/<int:doctor_id>/device-token", methods=["POST"])
+def save_doctor_device_token(doctor_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "status": "error",
+            "message": "No data received"
+        }), 400
+
+    token = (data.get("token") or "").strip()
+
+    # The token is a long piece of text. Reject empty or silly values.
+    if not token or len(token) > 4096:
+        return jsonify({
+            "status": "error",
+            "message": "A valid token is required"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Find the user that belongs to this doctor
+        cursor.execute(
+            "SELECT user_id FROM doctors WHERE doctor_id = %s",
+            (doctor_id,)
+        )
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Doctor not found"
+            }), 404
+
+        user_id = row[0]
+
+        # Save the token. If this phone is already in the table,
+        # just update its owner and time (no duplicate rows).
+        cursor.execute("""
+            INSERT INTO device_tokens (user_id, token)
+            VALUES (%s, %s)
+            ON CONFLICT (token)
+            DO UPDATE SET
+                user_id = EXCLUDED.user_id,
+                updated_at = CURRENT_TIMESTAMP
+        """, (user_id, token))
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Token saved"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Save Doctor Device Token Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save the token"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ============================================================
+# FORGET A PHONE TOKEN (used when someone logs out)
+# So a logged-out phone no longer receives that person's alerts.
+# ============================================================
+
+@app.route("/api/device-token", methods=["DELETE"])
+def delete_device_token():
+    data = request.get_json(silent=True) or {}
+    token = (data.get("token") or "").strip()
+
+    if not token:
+        return jsonify({
+            "status": "error",
+            "message": "A token is required"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "DELETE FROM device_tokens WHERE token = %s",
+            (token,)
+        )
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Token removed"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Delete Device Token Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to remove the token"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# DOCTOR ACCEPTS OR REJECTS A BOOKING
+# Only an appointment that is "Pending" can be answered.
+# Accept -> "Scheduled", Reject -> "Rejected".
+# The patient gets a notice and a push notification.
+# ============================================================
+
+@app.route(
+    "/api/doctors/<int:doctor_id>/appointments/<int:appointment_id>/respond",
+    methods=["PUT"]
+)
+def respond_to_appointment(doctor_id, appointment_id):
+    data = request.get_json(silent=True) or {}
+    decision = data.get("decision")
+
+    # The answer must be "accept" or "reject"
+    if decision not in ("accept", "reject"):
+        return jsonify({
+            "status": "error",
+            "message": "decision must be accept or reject"
+        }), 400
+
+    new_status = "Scheduled" if decision == "accept" else "Rejected"
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Change the status, but only for this doctor's Pending appointment
+        cursor.execute("""
+            UPDATE appointments
+            SET status = %s
+            WHERE appointment_id = %s
+              AND doctor_id = %s
+              AND status = 'Pending'
+            RETURNING appointment_id
+        """, (new_status, appointment_id, doctor_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "Appointment not found or is not waiting for a decision"
+            }), 404
+
+        conn.commit()
+
+        # ----- Tell the patient. A problem here must never undo or
+        # block the doctor's answer, so it has its own try/except. -----
+        try:
+            cursor.execute("""
+                SELECT p.user_id, du.full_name, a.appointment_date, a.start_time
+                FROM appointments a
+                JOIN patients p
+                    ON a.patient_id = p.patient_id
+                JOIN doctors d
+                    ON a.doctor_id = d.doctor_id
+                JOIN users du
+                    ON d.user_id = du.user_id
+                WHERE a.appointment_id = %s
+            """, (appointment_id,))
+
+            info = cursor.fetchone()
+
+            if info:
+                patient_user_id = info[0]
+                doctor_name = info[1]
+                when = f"{info[2]} at {str(info[3])[:5]}"
+
+                if decision == "accept":
+                    title = "Appointment accepted"
+                    message = f"{doctor_name} accepted your appointment on {when}."
+                    notice_type = "AppointmentAccepted"
+                else:
+                    title = "Appointment not accepted"
+                    message = (
+                        f"{doctor_name} could not accept your appointment on "
+                        f"{when}. Please book another time."
+                    )
+                    notice_type = "AppointmentRejected"
+
+                # Save the notice (for the Alerts list in the profile)
+                cursor.execute("""
+                    INSERT INTO notifications
+                        (user_id, title, message, type, appointment_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    patient_user_id, title, message, notice_type, appointment_id
+                ))
+
+                conn.commit()
+
+                # Send the push notification to the patient's phone(s)
+                send_push_to_user(
+                    patient_user_id,
+                    title,
+                    message,
+                    {
+                        "type": notice_type,
+                        "appointment_id": str(appointment_id)
+                    }
+                )
+
+        except Exception as notice_error:
+            conn.rollback()
+            print("Appointment answer notice error:", notice_error)
+
+        return jsonify({
+            "status": "success",
+            "message": "Appointment accepted" if decision == "accept"
+                       else "Appointment rejected",
+            "new_status": new_status
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Respond To Appointment Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to answer the appointment"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+# ============================================================
+# APPOINTMENT REMINDERS
+# A small timer inside the server checks every minute for
+# appointments that start within the next 10 minutes. The doctor
+# and the patient each get one push notification per appointment.
+# It only works while the server is running.
+# ============================================================
+
+# How many minutes before the start the reminder is sent
+REMINDER_MINUTES = 10
+
+
+def send_due_reminders():
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Scheduled appointments that start within the next few minutes.
+        # (appointment_date + start_time) is the exact start date and time.
+        cursor.execute("""
+            SELECT
+                a.appointment_id,
+                a.start_time,
+                pu.user_id,
+                pu.full_name,
+                du.user_id,
+                du.full_name
+            FROM appointments a
+            JOIN patients p
+                ON a.patient_id = p.patient_id
+            JOIN users pu
+                ON p.user_id = pu.user_id
+            JOIN doctors d
+                ON a.doctor_id = d.doctor_id
+            JOIN users du
+                ON d.user_id = du.user_id
+            WHERE a.status = 'Scheduled'
+              AND (a.appointment_date + a.start_time) > CURRENT_TIMESTAMP
+              AND (a.appointment_date + a.start_time)
+                    <= CURRENT_TIMESTAMP + (%s * INTERVAL '1 minute')
+        """, (REMINDER_MINUTES,))
+
+        rows = cursor.fetchall()
+
+        for row in rows:
+            appointment_id = row[0]
+            start = str(row[1])[:5]  # For example 11:30
+            patient_user_id, patient_name = row[2], row[3]
+            doctor_user_id, doctor_name = row[4], row[5]
+
+            # Each person gets their own message
+            recipients = [
+                (
+                    doctor_user_id,
+                    f"Consultation with {patient_name} starts at {start}.",
+                ),
+                (
+                    patient_user_id,
+                    f"Your appointment with {doctor_name} starts at {start}.",
+                ),
+            ]
+
+            for user_id, message in recipients:
+                # Skip if this person was already reminded about this
+                # appointment (the notifications table remembers it)
+                cursor.execute("""
+                    SELECT 1
+                    FROM notifications
+                    WHERE user_id = %s
+                      AND appointment_id = %s
+                      AND type = 'AppointmentReminder'
+                    LIMIT 1
+                """, (user_id, appointment_id))
+
+                if cursor.fetchone():
+                    continue
+
+                # Save the notice first, so it can never be sent twice
+                cursor.execute("""
+                    INSERT INTO notifications
+                        (user_id, title, message, type, appointment_id)
+                    VALUES (%s, %s, %s, 'AppointmentReminder', %s)
+                """, (
+                    user_id,
+                    "Appointment starting soon",
+                    message,
+                    appointment_id
+                ))
+
+                conn.commit()
+
+                # Then send the push notification
+                send_push_to_user(
+                    user_id,
+                    "Appointment starting soon",
+                    message,
+                    {
+                        "type": "AppointmentReminder",
+                        "appointment_id": str(appointment_id)
+                    }
+                )
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Reminder check error:", e)
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# Runs forever in the background: check, sleep one minute, repeat
+def reminder_loop():
+    while True:
+        try:
+            send_due_reminders()
+        except Exception as e:
+            print("Reminder loop error:", e)
+
+        time.sleep(60)
+
+
+# Starts the background timer (called once when the server starts)
+def start_reminder_thread():
+    thread = threading.Thread(target=reminder_loop, daemon=True)
+    thread.start()
+    print("Reminder timer started")
+
+# ============================================================
+# DOCTOR SCHEDULE AND FREE SLOTS
+# The doctor saves working days, hours and days off. The patient's
+# booking screen asks for the free slots of a doctor on a date.
+# ============================================================
+
+# Used when a doctor has not saved a schedule yet.
+# These are the same fixed slots the app showed before.
+DEFAULT_SLOT_STARTS = [
+    dt.time(9, 0), dt.time(9, 30), dt.time(10, 0),
+    dt.time(10, 30), dt.time(11, 0), dt.time(11, 30),
+    dt.time(13, 0), dt.time(13, 30), dt.time(14, 0),
+    dt.time(14, 30), dt.time(15, 0), dt.time(15, 30),
+    dt.time(17, 0), dt.time(17, 30), dt.time(18, 0), dt.time(18, 30),
+]
+
+DEFAULT_SLOT_MINUTES = 30
+
+
+# Turns a time into the text the app uses, for example "09:30 AM"
+def slot_label(t):
+    return t.strftime("%I:%M %p")
+
+
+# Cuts the working hours into slots. Only slots that END before the
+# working hours end are kept.
+def make_slot_starts(start, end, minutes):
+    slots = []
+    today = dt.date.today()
+    current = dt.datetime.combine(today, start)
+    limit = dt.datetime.combine(today, end)
+    step = dt.timedelta(minutes=minutes)
+
+    while current + step <= limit:
+        slots.append(current.time())
+        current += step
+
+    return slots
+
+
+# ----- Read a doctor's saved schedule -----
+@app.route("/api/doctors/<int:doctor_id>/schedule", methods=["GET"])
+def get_doctor_schedule(doctor_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT working_days, start_time, end_time, slot_minutes
+            FROM doctor_schedules
+            WHERE doctor_id = %s
+        """, (doctor_id,))
+
+        row = cursor.fetchone()
+
+        # Is the doctor switched on as available for consultations?
+        cursor.execute(
+            "SELECT is_available FROM doctors WHERE doctor_id = %s",
+            (doctor_id,)
+        )
+        availability_row = cursor.fetchone()
+        is_available = (availability_row[0] == 'Y') if availability_row else True
+
+        # No schedule saved yet
+        if not row:
+            return jsonify({
+                "status": "success",
+                "schedule": None,
+                "is_available": is_available
+            }), 200
+
+        # Only days off that are today or later are interesting
+        cursor.execute("""
+            SELECT off_date
+            FROM doctor_days_off
+            WHERE doctor_id = %s
+              AND off_date >= CURRENT_DATE
+            ORDER BY off_date
+        """, (doctor_id,))
+
+        days_off = [str(r[0]) for r in cursor.fetchall()]
+
+        return jsonify({
+            "status": "success",
+            "schedule": {
+                "working_days": list(row[0]),
+                "start_time": row[1].strftime("%H:%M"),
+                "end_time": row[2].strftime("%H:%M"),
+                "slot_minutes": row[3],
+                "days_off": days_off
+            },
+            "is_available": is_available
+        }), 200
+
+    except Exception as e:
+        print("Get Schedule Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the schedule"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- Save a doctor's schedule -----
+@app.route("/api/doctors/<int:doctor_id>/schedule", methods=["PUT"])
+def save_doctor_schedule(doctor_id):
+    data = request.get_json(silent=True) or {}
+
+    # --- Check what the app sent ---
+    working_days = data.get("working_days")
+
+    if (
+        not isinstance(working_days, list)
+        or not working_days
+        or any(
+            (not isinstance(d, int)) or d < 1 or d > 7
+            for d in working_days
+        )
+    ):
+        return jsonify({
+            "status": "error",
+            "message": "Please choose at least one working day"
+        }), 400
+
+    try:
+        start = dt.datetime.strptime(data.get("start_time", ""), "%H:%M").time()
+        end = dt.datetime.strptime(data.get("end_time", ""), "%H:%M").time()
+    except ValueError:
+        return jsonify({
+            "status": "error",
+            "message": "Please send the times like 09:00"
+        }), 400
+
+    if end <= start:
+        return jsonify({
+            "status": "error",
+            "message": "The end time must be after the start time"
+        }), 400
+
+    slot_minutes = data.get("slot_minutes")
+
+    if (
+        not isinstance(slot_minutes, int)
+        or slot_minutes < 10
+        or slot_minutes > 120
+    ):
+        return jsonify({
+            "status": "error",
+            "message": "The slot length must be between 10 and 120 minutes"
+        }), 400
+
+    days_off_input = data.get("days_off") or []
+
+    if not isinstance(days_off_input, list) or len(days_off_input) > 366:
+        return jsonify({
+            "status": "error",
+            "message": "Days off must be a list of dates"
+        }), 400
+
+    days_off = []
+
+    try:
+        for text in days_off_input:
+            days_off.append(dt.date.fromisoformat(text))
+    except (ValueError, TypeError):
+        return jsonify({
+            "status": "error",
+            "message": "Please send the days off like 2026-12-25"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT doctor_id FROM doctors WHERE doctor_id = %s",
+            (doctor_id,)
+        )
+
+        if not cursor.fetchone():
+            return jsonify({
+                "status": "error",
+                "message": "Doctor not found"
+            }), 404
+
+        # Save the schedule (create it, or replace the old one)
+        cursor.execute("""
+            INSERT INTO doctor_schedules
+                (doctor_id, working_days, start_time, end_time, slot_minutes)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (doctor_id)
+            DO UPDATE SET
+                working_days = EXCLUDED.working_days,
+                start_time = EXCLUDED.start_time,
+                end_time = EXCLUDED.end_time,
+                slot_minutes = EXCLUDED.slot_minutes,
+                updated_at = CURRENT_TIMESTAMP
+        """, (doctor_id, working_days, start, end, slot_minutes))
+
+        # Replace the days off with the new list
+        cursor.execute(
+            "DELETE FROM doctor_days_off WHERE doctor_id = %s",
+            (doctor_id,)
+        )
+
+        for day in set(days_off):
+            cursor.execute("""
+                INSERT INTO doctor_days_off (doctor_id, off_date)
+                VALUES (%s, %s)
+            """, (doctor_id, day))
+
+        # The "available for consultations" switch. When it is off,
+        # patients cannot see or book this doctor.
+        cursor.execute("""
+            UPDATE doctors
+            SET is_available = %s
+            WHERE doctor_id = %s
+        """, (
+            'N' if data.get("is_available") is False else 'Y',
+            doctor_id
+        ))
+
+        # Everything above is saved together, or not at all   
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Schedule saved"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Save Schedule Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save the schedule"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- The free slots of a doctor on one date -----
+@app.route("/api/doctors/<int:doctor_id>/slots", methods=["GET"])
+def get_free_slots(doctor_id):
+    # The date comes like ?date=2026-10-26
+    try:
+        day = dt.date.fromisoformat(request.args.get("date", ""))
+    except ValueError:
+        return jsonify({
+            "status": "error",
+            "message": "Please send the date like 2026-10-26"
+        }), 400
+
+    # A date that has already passed has no slots
+    if day < dt.date.today():
+        return jsonify({
+            "status": "success",
+            "slots": [],
+            "message": "This date has already passed."
+        }), 200
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # 1. The doctor's schedule (or the default slots)
+        cursor.execute("""
+            SELECT working_days, start_time, end_time, slot_minutes
+            FROM doctor_schedules
+            WHERE doctor_id = %s
+        """, (doctor_id,))
+
+        schedule = cursor.fetchone()
+
+        if schedule:
+            working_days, start, end, minutes = schedule
+
+            # isoweekday(): Monday = 1 ... Sunday = 7
+            if day.isoweekday() not in working_days:
+                return jsonify({
+                    "status": "success",
+                    "slots": [],
+                    "message": "The doctor does not work on this day."
+                }), 200
+
+            starts = make_slot_starts(start, end, minutes)
+        else:
+            minutes = DEFAULT_SLOT_MINUTES
+            starts = DEFAULT_SLOT_STARTS
+
+        # 2. Is it one of the doctor's days off?
+        cursor.execute("""
+            SELECT 1
+            FROM doctor_days_off
+            WHERE doctor_id = %s
+              AND off_date = %s
+        """, (doctor_id, day))
+
+        if cursor.fetchone():
+            return jsonify({
+                "status": "success",
+                "slots": [],
+                "message": "The doctor is not available on this date."
+            }), 200
+
+        # 3. Times that are already booked (Pending or Scheduled)
+        cursor.execute("""
+            SELECT
+                start_time,
+                COALESCE(end_time, start_time + INTERVAL '30 minutes')
+            FROM appointments
+            WHERE doctor_id = %s
+              AND appointment_date = %s
+              AND status IN ('Pending', 'Scheduled')
+        """, (doctor_id, day))
+
+        booked = cursor.fetchall()
+
+        # 4. Keep only the free slots that are still in the future
+        now = dt.datetime.now()
+        free = []
+
+        for s in starts:
+            slot_start = dt.datetime.combine(day, s)
+            slot_end = (slot_start + dt.timedelta(minutes=minutes)).time()
+
+            # Today: hide slots that have already started
+            if slot_start <= now:
+                continue
+
+            # Hide the slot if it overlaps an existing booking
+            taken = any(
+                s < b_end and slot_end > b_start
+                for b_start, b_end in booked
+            )
+
+            if not taken:
+                free.append(slot_label(s))
+
+        return jsonify({
+            "status": "success",
+            "slots": free,
+            "message": "" if free else "No free slots on this date."
+        }), 200
+
+    except Exception as e:
+        print("Get Free Slots Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the slots"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
 if __name__ == "__main__":
 
         app.run(
