@@ -6,6 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'video_call_screen.dart';
+import 'app_language.dart'; // appLanguage: the language the user chose
 
 // ============================================================
 // PUSH NOTIFICATIONS
@@ -141,7 +142,43 @@ Future<void> openLaunchNotificationIfAny() async {
 // Sends this phone's token to the server for the logged-in patient.
 // Called by the patient home screen when it opens.
 // ------------------------------------------------------------
+// Becomes true once we start listening for language changes,
+// so the listener is only added one time
+bool _languageListenerAdded = false;
+
+// Sends the chosen language to the server for the logged-in patient
+Future<void> _sendPatientLanguage() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final patientId = prefs.getInt('patientId');
+
+    // Not a logged-in patient (for example a doctor): nothing to do
+    if (patientId == null) return;
+
+    await ApiService.savePatientLanguage(
+      patientId: patientId,
+      language: appLanguage.value,
+    );
+  } catch (e) {
+    // A failure here never breaks the app
+    print('Could not send language: $e');
+  }
+}
+
+// Sends the language now, and again every time the user changes it
+void syncPatientLanguage() {
+  _sendPatientLanguage();
+
+  if (!_languageListenerAdded) {
+    _languageListenerAdded = true;
+    appLanguage.addListener(_sendPatientLanguage);
+  }
+}
+
 Future<void> registerPatientPushToken() async {
+  // Save the language on the server first. This does not need push
+  // to be working, so it runs before the Firebase checks below.
+  syncPatientLanguage();
   // Do nothing if Firebase did not start
   await _waitForPush();
   if (!pushReady) return;

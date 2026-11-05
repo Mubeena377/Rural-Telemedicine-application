@@ -9,21 +9,29 @@ from sklearn.metrics import accuracy_score, classification_report
 
 
 # --------------------------------------------------
-# 1. LOAD DATASET
+# 1. LOAD DATASETS
 # --------------------------------------------------
-df = pd.read_csv("triage_dataset.csv")
-# Clean column names
-df.columns = (
-    df.columns
-    .str.replace(r"\\t", "", regex=True)
-    .str.replace("\t", "", regex=False)
-    .str.strip()
-)
 
-print("Dataset loaded successfully.")
+original_df = pd.read_csv("triage_dataset.csv")
+new_df = pd.read_csv("new_triage_dataset.csv")
+
+# Clean column names in both datasets
+for dataset in [original_df, new_df]:
+    dataset.columns = (
+        dataset.columns
+        .str.replace(r"\t", "", regex=True)
+        .str.strip()
+    )
+
+# Combine both datasets
+df = pd.concat([original_df, new_df], ignore_index=True)
+
+print("Original dataset columns:", list(original_df.columns))
+print("New dataset columns:", list(new_df.columns))
+
+print("\nDataset loaded successfully.")
 print("Number of rows:", len(df))
 print("Columns:", list(df.columns))
-
 
 # --------------------------------------------------
 # 2. CHECK REQUIRED COLUMNS

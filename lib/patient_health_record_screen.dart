@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'patient_prescriptions_screen.dart';
+import 'patient_reports_screen.dart';
 
 // ============================================================
 // PATIENT HEALTH RECORD SCREEN
@@ -662,6 +663,65 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
             )
           else
             ...consultations.map(consultationCard),
+
+          // ----- Shortcut to reports (lab results and scans) -----
+          sectionHeader('Reports', Icons.folder_open),
+
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            // InkWell gives the ripple effect when tapped
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PatientReportsScreen(),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Colors.indigo.withOpacity(0.12),
+                      child: const Icon(
+                        Icons.science_outlined,
+                        color: Colors.indigo,
+                        size: 30,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'My Reports',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Upload and keep your test results and scans',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 18),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
           // ----- Shortcut to prescriptions -----
           sectionHeader('Prescriptions', Icons.medication),

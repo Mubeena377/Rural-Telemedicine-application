@@ -20,6 +20,14 @@ import 'patient_details_screen.dart';
 import 'doctor_patients_screen.dart';
 import 'emergency_screen.dart';
 import 'choose_language.dart';
+import 'alerts_screen.dart';
+import 'medicine_reminder_screen.dart';
+import 'first_aid_screen.dart';
+import 'app_language.dart';
+export 'app_language.dart';
+import 'admin_screens.dart';
+import 'doctor_consultations_screen.dart';
+import 'help_support_screen.dart';
 
 final ValueNotifier<String> ambulanceStatus =
     ValueNotifier<String>('Available');
@@ -1078,6 +1086,7 @@ String tr(String text, String language) {
   'mr_IN': 'ट्रायेजसाठी तुमची लक्षणे सांगा किंवा वैद्यकीय माहिती अपलोड करा',
   'bn_IN': 'ট্রায়াজের জন্য আপনার উপসর্গগুলি বলুন অথবা চিকিৎসা সংক্রান্ত তথ্য আপলোড করুন',
 },
+
 'Manage your doctor appointments': {
   'en_IN': 'Manage your doctor appointments',
   'hi_IN': 'अपने डॉक्टर की अपॉइंटमेंट प्रबंधित करें',
@@ -2799,16 +2808,7 @@ String tr(String text, String language) {
   'mr_IN': 'व्हॉइस असिस्टंट सेटिंग्ज येथे उपलब्ध असतील.',
   'bn_IN': 'ভয়েস অ্যাসিস্ট্যান্ট সেটিংস এখানে পাওয়া যাবে।',
 },
-'Help & Support will be available here.': {
-  'en_IN': 'Help & Support will be available here.',
-  'hi_IN': 'सहायता और समर्थन यहाँ उपलब्ध होगा।',
-  'kn_IN': 'ಸಹಾಯ ಮತ್ತು ಬೆಂಬಲ ಇಲ್ಲಿ ಲಭ್ಯವಿರುತ್ತದೆ.',
-  'ta_IN': 'உதவி மற்றும் ஆதரவு இங்கே கிடைக்கும்.',
-  'te_IN': 'సహాయం & మద్దతు ఇక్కడ అందుబాటులో ఉంటుంది.',
-  'ml_IN': 'സഹായവും പിന്തുണയും ഇവിടെ ലഭ്യമാകും.',
-  'mr_IN': 'मदत आणि समर्थन येथे उपलब्ध असेल.',
-  'bn_IN': 'সহায়তা ও সহায়তা এখানে পাওয়া যাবে।',
-},
+
 'Your booked appointments will appear here.': {
   'en_IN': 'Your booked appointments will appear here.',
   'hi_IN': 'आपकी बुक की गई अपॉइंटमेंट यहाँ दिखाई देंगी।',
@@ -2819,17 +2819,34 @@ String tr(String text, String language) {
   'mr_IN': 'तुमच्या बुक केलेल्या अपॉइंटमेंट्स येथे दिसतील.',
   'bn_IN': 'আপনার বুক করা অ্যাপয়েন্টমেন্টগুলি এখানে দেখা যাবে.',
 },
+    // ---- Home screen: My Prescriptions card ----
+    'My Prescriptions': {
+      'en_IN': 'My Prescriptions',
+      'hi_IN': 'मेरे प्रिस्क्रिप्शन',
+      'kn_IN': 'ನನ್ನ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್‌ಗಳು',
+      'ta_IN': 'என் மருந்துச் சீட்டுகள்',
+      'te_IN': 'నా ప్రిస్క్రిప్షన్లు',
+      'ml_IN': 'എന്റെ കുറിപ്പടികൾ',
+      'mr_IN': 'माझे प्रिस्क्रिप्शन',
+      'bn_IN': 'আমার প্রেসক্রিপশন',
+    },
+
+    'View prescriptions from your doctors': {
+      'en_IN': 'View prescriptions from your doctors',
+      'hi_IN': 'अपने डॉक्टरों के प्रिस्क्रिप्शन देखें',
+      'kn_IN': 'ನಿಮ್ಮ ವೈದ್ಯರ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್‌ಗಳನ್ನು ನೋಡಿ',
+      'ta_IN': 'உங்கள் மருத்துவர்களின் மருந்துச் சீட்டுகளைப் பார்க்கவும்',
+      'te_IN': 'మీ వైద్యుల ప్రిస్క్రిప్షన్లను చూడండి',
+      'ml_IN': 'നിങ്ങളുടെ ഡോക്ടർമാരുടെ കുറിപ്പടികൾ കാണുക',
+      'mr_IN': 'तुमच्या डॉक्टरांची प्रिस्क्रिप्शन पहा',
+      'bn_IN': 'আপনার ডাক্তারদের প্রেসক্রিপশন দেখুন',
+    },
  };
 
   return translations[text]?[language] ?? text;
 }
-final ValueNotifier<String> appLanguage = ValueNotifier<String>('en_IN');
-
-String get selectedLanguage => appLanguage.value;
-
-set selectedLanguage(String value) {
-  appLanguage.value = value;
-}
+// The language setting (appLanguage and selectedLanguage) now lives in
+// app_language.dart
 
 Future<void> showLanguageSelector(BuildContext context) async {
   const languages = <Map<String, String>>[
@@ -2902,6 +2919,10 @@ class VoiceAssistant {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load the language the user chose last time (Hindi, Tamil, etc.)
+  // before the first screen draws, so the app opens in that language.
+  await loadSavedLanguage();
 
   const AndroidInitializationSettings androidSettings =
       AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -3776,6 +3797,19 @@ await prefs.setString(
           ),
         );
       }
+            // ====================================================
+      // ADMIN
+      // ====================================================
+
+      else if (value == 'admin') {
+        debugPrint('ADMIN: menu tapped');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const AdminLoginScreen(),
+          ),
+        );
+      }
     },
 
     itemBuilder: (context) => const [
@@ -3826,6 +3860,20 @@ await prefs.setString(
         ),
       ],
     ),
+          // 🛡️ ADMIN
+      PopupMenuItem<String>(
+        value: 'admin',
+        child: Row(
+          children: [
+            Icon(
+              Icons.admin_panel_settings,
+              color: Color(0xFF10192F),
+            ),
+            SizedBox(width: 10),
+            Text('Admin Login'),
+          ],
+        ),
+      ),
   ],
 ),
       body: SafeArea(
@@ -5164,16 +5212,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                title: const Text(
-                  'My Prescriptions',
+                title:  Text(
+                  tr('My Prescriptions', selectedLanguage),
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
 
-                subtitle: const Text(
-                  'View prescriptions from your doctors',
+                subtitle:  Text(
+                  tr('View prescriptions from your doctors', selectedLanguage),
                 ),
 
                 trailing: const Icon(
@@ -5417,9 +5465,21 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
 
                 Expanded(
-                  child: serviceCard(
-                    Icons.medication,
-                    tr('Medicine\nReminder', selectedLanguage),
+                  // GestureDetector makes the card react to a tap
+                  child: GestureDetector(
+                    onTap: () {
+                      // Open the Medicine Reminder screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MedicineReminderScreen(),
+                        ),
+                      );
+                    },
+                    child: serviceCard(
+                      Icons.alarm,
+                      tr('Medicine\nReminder', selectedLanguage),
+                    ),
                   ),
                 ),
 
@@ -5472,9 +5532,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 10),
 
                 Expanded(
-                  child: serviceCard(
-                    Icons.medical_services,
-                    tr('First Aid\nGuide', selectedLanguage),
+                  // GestureDetector makes the card react to a tap
+                  child: GestureDetector(
+                    onTap: () {
+                      // Open the First Aid Guide
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FirstAidScreen(),
+                        ),
+                      );
+                    },
+                    child: serviceCard(
+                      Icons.medical_services,
+                      tr('First Aid\nGuide', selectedLanguage),
+                    ),
                   ),
                 ),
               ],
@@ -5842,6 +5914,9 @@ class _TriageScreenState extends State<TriageScreen> {
         title: title,
         message: message,
         action: action,
+        // The first aid topic picked by the server (can be empty)
+        firstAidId: int.tryParse('${result['first_aid_id']}'),
+        firstAidName: result['first_aid_name']?.toString(),        
       ),
     ),
   );
@@ -6242,6 +6317,7 @@ class _TriageScreenState extends State<TriageScreen> {
   }
 }
 
+
 Future<void> activateSOS(BuildContext context) async {
   final position = await getCurrentLocation();
 
@@ -6272,6 +6348,7 @@ Future<void> activateSOS(BuildContext context) async {
     ),
   );
 }
+
 Future<Position?> getCurrentLocation() async {
   bool serviceEnabled;
   LocationPermission permission;
@@ -6312,17 +6389,41 @@ class TriageResultScreen extends StatelessWidget {
   final String message;
   final String action;
 
+  // The first aid topic the server picked for these symptoms.
+  // Both stay empty (null) when no topic fitted.
+  final int? firstAidId;
+  final String? firstAidName;
+
   const TriageResultScreen({
     super.key,
     required this.priority,
     required this.title,
     required this.message,
     required this.action,
+    this.firstAidId,
+    this.firstAidName,
   });
 
   // ------------------------------------------------------------
   // BASIC FIRST AID GUIDANCE
   // ------------------------------------------------------------
+  // Opens the first aid topic picked for these symptoms. If the server
+  // found no matching topic, it opens the full First Aid Guide instead.
+  void openFirstAid(BuildContext context) {
+    final id = firstAidId;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => id != null
+            ? FirstAidDetailScreen(
+                firstAidId: id,
+                name: firstAidName ?? '',
+              )
+            : const FirstAidScreen(),
+      ),
+    );
+  }
 
   void showFirstAidGuidance(BuildContext context) {
     String guidance;
@@ -6614,11 +6715,10 @@ void bookConsultation(BuildContext context) {
                 height: 60,
 
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    showFirstAidGuidance(
-                      context,
-                    );
-                  },
+                   onPressed: () {
+                    // Open the first aid topic that fits the symptoms
+                    openFirstAid(context);
+                  },               
 
                   icon: const Icon(
                     Icons.medical_services,
@@ -10643,11 +10743,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subtitle: tr('Notifications', selectedLanguage),
                     iconColor: Colors.purple,
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                         SnackBar(
-                          content: Text(
-                            tr('Notification settings will be available here.', selectedLanguage),
-                          ),
+                      // Open the Alerts screen (switches and notification list)
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AlertsScreen(),
                         ),
                       );
                     },
@@ -10689,21 +10789,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
 
-            _profileListTile(
-              icon: Icons.help_outline_rounded,
-              iconColor: Colors.indigo,
-              title: tr('Help & Support', selectedLanguage),
-              subtitle: tr('Get help using the app', selectedLanguage),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                   SnackBar(
-                    content: Text(
-                      tr('Help & Support will be available here.', selectedLanguage),
+
+                 _profileListTile(
+                icon: Icons.help_outline_rounded,
+                iconColor: Colors.indigo,
+                title: tr('Help & Support', selectedLanguage),
+                subtitle: tr('Get help using the app', selectedLanguage),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HelpSupportScreen(),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
 
             const SizedBox(height: 26),
 
@@ -11023,7 +11123,7 @@ class SOSLocationScreen extends StatefulWidget {
 }
 
 class _SOSLocationScreenState extends State<SOSLocationScreen> {
-  int remainingSeconds = 30;
+  int remainingSeconds = 10;
   Timer? countdownTimer;
 
 @override
@@ -19233,8 +19333,14 @@ class DoctorDashboardScreen extends StatelessWidget {
                 Navigator.push(
                  context,
                 MaterialPageRoute(
-                  builder: (context) => DoctorConsultationsScreen(
-                      doctorId: doctorId,
+                  builder: (context) => DoctorConsultationQueueScreen(
+                    doctorId: doctorId,
+                    // Opens the form where the doctor writes the notes
+                    notesScreenBuilder: (consultation, appointmentId) =>
+                        DoctorConsultationDetailsScreen(
+                      consultation: consultation,
+                      appointmentId: appointmentId,
+                    ),
                   ),
                 ),
                );           
@@ -20234,10 +20340,31 @@ Future<void> loadAppointments() async {
 
     if (result['status'] == 'success') {
       setState(() {
-        appointments =
-            List<Map<String, dynamic>>.from(
+        // Keep only the appointments that still belong on this screen:
+        //  - Pending: waiting for the doctor to accept or reject
+        //  - Rejected / Cancelled: kept here as a record
+        // Accepted ones live in Consultations, and finished ones in
+        // Consultation History.
+        appointments = List<Map<String, dynamic>>.from(
           result['appointments'] ?? [],
-        );
+        ).where((a) {
+          final status = (a['status'] ?? '').toString();
+          return status == 'Pending' ||
+              status == 'Rejected' ||
+              status == 'Cancelled';
+        }).toList()
+          // Pending ones first (they need an answer), then the rest.
+          // Inside each group the newest booking comes first (a higher
+          // appointment_id means a newer request).
+          ..sort((a, b) {
+            final aPending = a['status'] == 'Pending';
+            final bPending = b['status'] == 'Pending';
+
+            if (aPending != bPending) return aPending ? -1 : 1;
+
+            return (b['appointment_id'] as int)
+                .compareTo(a['appointment_id'] as int);
+          });
         isLoading = false;
       });
     } else {
@@ -20451,6 +20578,62 @@ Widget appointmentDetailRow(
       ],
     ),
   );
+}
+
+// The doctor cancels a Scheduled appointment. It asks first, because
+// the patient will be told and the time becomes free again.
+Future<void> cancelAsDoctor(Map<String, dynamic> appointment) async {
+  final appointmentId = appointment['appointment_id'] as int;
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return AlertDialog(
+        title: const Text('Cancel this appointment?'),
+        content: const Text(
+          'The patient will be told that you cancelled it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep it'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel appointment'),
+          ),
+        ],
+      );
+    },
+  );
+
+  // The doctor tapped "Keep it" (or closed the popup)
+  if (confirmed != true) return;
+
+  // Send the cancellation to the server (function in api_service.dart)
+  final result = await ApiService.doctorCancelAppointment(
+    doctorId: widget.doctorId,
+    appointmentId: appointmentId,
+  );
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        result['success'] == true
+            ? 'Appointment cancelled.'
+            : (result['message'] ?? 'Failed to cancel the appointment.')
+                .toString(),
+      ),
+      backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+    ),
+  );
+
+  // Reload the list so the card shows its new status
+  if (result['success'] == true) {
+    await loadAppointments();
+  }
 }
 
 // The doctor accepts or rejects a booking that is waiting (Pending).
@@ -20988,7 +21171,7 @@ void initState() {
 
 Future<void> loadConsultations() async {
   try {
-    final result = await ApiService.getDoctorConsultations(
+    final result = await ApiService.getDoctorConsultationQueue(
       widget.doctorId,
     );
 
@@ -21005,6 +21188,11 @@ Future<void> loadConsultations() async {
           'mode': item['consultation_mode']?.toString() ?? '',
           'reason': item['reason_for_visit']?.toString() ?? '',
           'status': item['status']?.toString() ?? '',
+           // True once the appointment time has arrived (Start is enabled)
+          'canStart': item['can_start'] == true,
+          // Shown on the button before the time arrives
+          'startsAt':
+              '${item['appointment_date'] ?? ''} at ${(item['start_time'] ?? '00:00:00').toString().substring(0, 5)}',
         };
       }).toList();
 
@@ -21235,16 +21423,23 @@ void startConsultation(Map<String, dynamic> consultation) {
                 width: double.infinity,
                 height: 46,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    startConsultation(consultation);
-                  },
+                  // Disabled (null) until the appointment time arrives
+                  onPressed: consultation['canStart'] == true
+                      ? () {
+                          startConsultation(consultation);
+                        }
+                      : null,
+
                   icon: const Icon(
                     Icons.video_call,
                     size: 20,
                   ),
-                  label: const Text(
-                    'Start Consultation',
-                    style: TextStyle(
+                  label: Text(
+                    // Before the time arrives, say when it starts
+                    consultation['canStart'] == true
+                        ? 'Start Consultation'
+                        : 'Starts ${consultation['startsAt']}',
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                     ),
                   ),

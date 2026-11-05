@@ -1,0 +1,1003 @@
+dataset_id,symptoms,category
+4999,"The person reports mild tension headache, without difficulty breathing.",FIRST AID
+5000,"The person reports mild tension headache, without breathlessness.",FIRST AID
+5001,"The person reports mild tension head pain, without breathing difficulty.",FIRST AID
+5002,"A patient has common cold with sneezing, without heavy blood loss.",FIRST AID
+5003,"A patient has common cold with sneezing, without heavy active bleeding.",FIRST AID
+5004,"Reported symptom: mild raised temperature with tiredness, without loss of consciousness.",FIRST AID
+5005,"Reported symptom: mild high body temperature with tiredness, without loss of consciousness.",FIRST AID
+5006,"Patient reports persistent sore throat, with mild raised temperature.",CONSULTATION
+5007,"Patient reports persistent sore throat, with mild high body temperature.",CONSULTATION
+5008,"Patient reports person is unresponsive and not responding normally, with confusion.",EMERGENCY
+5009,"Patient reports person is not conscious and not responding normally, with confusion.",EMERGENCY
+5010,"A patient has mild tension head pain, after normal daily activity.",FIRST AID
+5011,"A patient has mild tension pain in the head, after normal daily activity.",FIRST AID
+5012,"Reported symptom: cough with mild raised temperature continuing for several days, without improving.",CONSULTATION
+5013,"Reported symptom: cough with mild high body temperature continuing for several days, without improving.",CONSULTATION
+5014,"Reported symptom: coughing with mild fever continuing for several days, without improving.",CONSULTATION
+5015,"Reported symptom: mild raised temperature with tiredness, after a minor incident.",FIRST AID
+5016,"Reported symptom: mild high body temperature with tiredness, after a minor incident.",FIRST AID
+5017,"The person reports mild coughing for one or two days, for a short time.",FIRST AID
+5018,"The person reports mild repeated coughing for one or two days, for a short time.",FIRST AID
+5019,"Patient reports small superficial thermal injury from brief contact with a warm object, with mild discomfort.",FIRST AID
+5020,"Patient reports small superficial skin burn from brief contact with a warm object, with mild discomfort.",FIRST AID
+5021,"The user says coughing continuing for several weeks, with occasional discomfort.",CONSULTATION
+5022,"The user says repeated coughing continuing for several weeks, with occasional discomfort.",CONSULTATION
+5023,"Patient reports severe allergic reaction with inflammation of the throat, with trouble speaking.",EMERGENCY
+5024,"Patient reports severe allergic reaction with puffiness of the throat, with trouble speaking.",EMERGENCY
+5025,"The user says mild head pain after a long day, without loss of consciousness.",FIRST AID
+5026,"The user says mild pain in the head after a long day, without loss of consciousness.",FIRST AID
+5027,"Patient reports persistent abdominal pain, with mild raised temperature.",CONSULTATION
+5028,"Patient reports persistent abdominal pain, with mild high body temperature.",CONSULTATION
+5029,"Patient reports persistent abdominal ache, with mild fever.",CONSULTATION
+5030,"Reported symptom: severe allergic reaction with inflammation of the throat, with severe discomfort.",EMERGENCY
+5031,"Reported symptom: severe allergic reaction with puffiness of the throat, with severe discomfort.",EMERGENCY
+5032,"A patient has sudden severe difficulty breathing after a possible allergic reaction, with a rapidly worsening condition.",EMERGENCY
+5033,"A patient has sudden severe breathlessness after a possible allergic reaction, with a rapidly worsening condition.",EMERGENCY
+5034,"Reported symptom: ongoing tooth ache, for more than a week.",CONSULTATION
+5035,"Reported symptom: ongoing tooth discomfort, for more than a week.",CONSULTATION
+5036,"Reported symptom: heavy blood loss that does not stop with firm pressure, with trouble speaking.",EMERGENCY
+5037,"Reported symptom: serious bleeding that does not stop with firm pressure, with trouble speaking.",EMERGENCY
+5038,"Reported symptom: severe blood loss that does not stop with firm pressure, with trouble speaking.",EMERGENCY
+5039,"Reported symptom: skin skin eruption that is not improving, with occasional discomfort.",CONSULTATION
+5040,"Reported symptom: skin skin outbreak that is not improving, with occasional discomfort.",CONSULTATION
+5041,"A patient has sudden severe headache with confusion and weakness, with severe breathlessness.",EMERGENCY
+5042,"A patient has sudden severe headache with confusion and weakness, with severe difficulty breathing.",EMERGENCY
+5043,"A patient has sudden severe head pain with confusion and weakness, with severe shortness of breath.",EMERGENCY
+5044,"Patient reports small superficial wound on a finger, without loss of consciousness.",FIRST AID
+5045,"Patient reports small superficial laceration on a finger, without loss of consciousness.",FIRST AID
+5046,"Reported symptom: mild coughing for one or two days, after a small bump.",FIRST AID
+5047,"Reported symptom: mild repeated coughing for one or two days, after a small bump.",FIRST AID
+5048,"The user says severe chest discomfort with heavy sweating, with confusion.",EMERGENCY
+5049,"The user says severe pain in the chest with heavy sweating, with confusion.",EMERGENCY
+5050,"The user says severe chest ache with heavy sweating, with confusion.",EMERGENCY
+5051,"The user says possible stroke symptoms beginning suddenly, with fainting.",EMERGENCY
+5052,"The user says sudden symptoms suggestive of stroke beginning suddenly, with fainting.",EMERGENCY
+5053,"The user says stroke-like symptoms beginning suddenly, with passing out.",EMERGENCY
+5054,"Patient reports skin skin eruption that is not improving, with sleep disturbance.",CONSULTATION
+5055,"Patient reports skin skin outbreak that is not improving, with sleep disturbance.",CONSULTATION
+5056,"Reported symptom: head pain occurring repeatedly, after meals.",CONSULTATION
+5057,"Reported symptom: pain in the head occurring repeatedly, after meals.",CONSULTATION
+5058,"The user says mild inflammation that persists, with reduced appetite.",CONSULTATION
+5059,"The user says mild puffiness that persists, with reduced appetite.",CONSULTATION
+5060,"Reported symptom: severe allergic reaction with inflammation of the throat, with sweating.",EMERGENCY
+5061,"Reported symptom: severe allergic reaction with puffiness of the throat, with sweating.",EMERGENCY
+5062,"Patient reports major injury with uncontrolled blood loss, with confusion.",EMERGENCY
+5063,"Patient reports major injury with uncontrolled active bleeding, with confusion.",EMERGENCY
+5064,"Patient reports small kitchen wound with bleeding that stops quickly, with slight swelling.",FIRST AID
+5065,"Patient reports minor kitchen laceration with bleeding that stops quickly, with slight swelling.",FIRST AID
+5066,"Patient reports minor kitchen wound with bleeding that stops quickly, with slight swelling.",FIRST AID
+5067,"A patient has minor insect bite with mild itchiness, with no major injury.",FIRST AID
+5068,"A patient has minor insect bite with mild itchy sensation, with no major injury.",FIRST AID
+5069,"The person reports sudden severe head pain with confusion and weakness, with severe pain.",EMERGENCY
+5070,"The person reports sudden severe pain in the head with confusion and weakness, with severe pain.",EMERGENCY
+5071,"The person reports sudden severe headache with confusion and weakness, with severe ache.",EMERGENCY
+5072,"Patient reports mild throat irritation for one day, without heavy blood loss.",FIRST AID
+5073,"Patient reports mild throat irritation for one day, without heavy active bleeding.",FIRST AID
+5074,"The user says severe chest pain with heavy sweating, with severe breathlessness.",EMERGENCY
+5075,"The user says severe chest pain with heavy sweating, with severe difficulty breathing.",EMERGENCY
+5076,"The user says severe chest discomfort with heavy sweating, with severe shortness of breath.",EMERGENCY
+5077,"Reported symptom: cough with mild raised temperature continuing for several days, after meals.",CONSULTATION
+5078,"Reported symptom: cough with mild high body temperature continuing for several days, after meals.",CONSULTATION
+5079,"Reported symptom: coughing with mild fever continuing for several days, after meals.",CONSULTATION
+5080,"The user says ongoing lower back ache, with occasional discomfort.",CONSULTATION
+5081,"The user says ongoing lower back discomfort, with occasional discomfort.",CONSULTATION
+5082,"Patient reports severe chest pressure with breathlessness, with confusion.",EMERGENCY
+5083,"Patient reports severe chest pressure with difficulty breathing, with confusion.",EMERGENCY
+5084,"The person reports mild inflammation that persists, with tiredness.",CONSULTATION
+5085,"The person reports mild puffiness that persists, with tiredness.",CONSULTATION
+5086,"Patient reports mild tension head pain, with discomfort that is manageable.",FIRST AID
+5087,"Patient reports mild tension pain in the head, with discomfort that is manageable.",FIRST AID
+5088,"Reported symptom: severe chest pressure with breathlessness, after a serious injury.",EMERGENCY
+5089,"Reported symptom: severe chest pressure with difficulty breathing, after a serious injury.",EMERGENCY
+5090,"The user says severe allergic reaction with inflammation of the throat, during the night.",EMERGENCY
+5091,"The user says severe allergic reaction with puffiness of the throat, during the night.",EMERGENCY
+5092,"A patient has repeated throwing up over the day, for several days.",CONSULTATION
+5093,"A patient has repeated being sick over the day, for several days.",CONSULTATION
+5094,"Reported symptom: mild fever with tiredness, with slight inflammation.",FIRST AID
+5095,"Reported symptom: mild fever with tiredness, with slight puffiness.",FIRST AID
+5096,"Reported symptom: mild raised temperature with tiredness, with slight swelling.",FIRST AID
+5097,"The user says joint ache continuing for weeks, after meals.",CONSULTATION
+5098,"The user says pain in a joint continuing for weeks, after meals.",CONSULTATION
+5099,"The user says joint discomfort continuing for weeks, after meals.",CONSULTATION
+5100,"A patient has cough with mild raised temperature continuing for several days, with reduced appetite.",CONSULTATION
+5101,"A patient has cough with mild high body temperature continuing for several days, with reduced appetite.",CONSULTATION
+5102,"A patient has coughing with mild fever continuing for several days, with reduced appetite.",CONSULTATION
+5103,"Reported symptom: cough with mild raised temperature continuing for several days, gradually worsening.",CONSULTATION
+5104,"Reported symptom: cough with mild high body temperature continuing for several days, gradually worsening.",CONSULTATION
+5105,"Reported symptom: coughing with mild fever continuing for several days, gradually worsening.",CONSULTATION
+5106,"A patient has small superficial wound on a finger, after normal daily activity.",FIRST AID
+5107,"A patient has small superficial laceration on a finger, after normal daily activity.",FIRST AID
+5108,"A patient has severe chest discomfort with heavy sweating, with a rapidly worsening condition.",EMERGENCY
+5109,"A patient has severe pain in the chest with heavy sweating, with a rapidly worsening condition.",EMERGENCY
+5110,"A patient has severe chest ache with heavy sweating, with a rapidly worsening condition.",EMERGENCY
+5111,"persistent abdominal ache, without improving.",CONSULTATION
+5112,"persistent abdominal discomfort, without improving.",CONSULTATION
+5113,"The person reports sudden severe head pain with confusion and weakness, with trouble speaking.",EMERGENCY
+5114,"The person reports sudden severe pain in the head with confusion and weakness, with trouble speaking.",EMERGENCY
+5115,"heavy blood loss that does not stop with firm pressure, started suddenly.",EMERGENCY
+5116,"serious bleeding that does not stop with firm pressure, started suddenly.",EMERGENCY
+5117,"severe blood loss that does not stop with firm pressure, started suddenly.",EMERGENCY
+5118,"mild sun-related skin burn, after brief exposure.",FIRST AID
+5119,"mild skin irritation from sun exposure, after brief exposure.",FIRST AID
+5120,"A patient has major injury with uncontrolled blood loss, with sweating.",EMERGENCY
+5121,"A patient has major injury with uncontrolled active bleeding, with sweating.",EMERGENCY
+5122,"The user says mild cold symptoms without difficulty breathing, with mild discomfort.",FIRST AID
+5123,"The user says mild cold symptoms without breathlessness, with mild discomfort.",FIRST AID
+5124,"persistent abdominal ache, despite normal rest.",CONSULTATION
+5125,"persistent abdominal discomfort, despite normal rest.",CONSULTATION
+5126,"Patient reports mild raised temperature with tiredness, with symptoms staying mild.",FIRST AID
+5127,"Patient reports mild high body temperature with tiredness, with symptoms staying mild.",FIRST AID
+5128,"ongoing lower back ache, mainly in the evening.",CONSULTATION
+5129,"ongoing lower back discomfort, mainly in the evening.",CONSULTATION
+5130,"Patient reports persistent loose stools, with mild fever.",CONSULTATION
+5131,"Patient reports persistent frequent watery stools, with mild fever.",CONSULTATION
+5132,"Patient reports persistent diarrhea, with mild raised temperature.",CONSULTATION
+5133,"The person reports severe allergic reaction with inflammation of the throat, with sweating.",EMERGENCY
+5134,"The person reports severe allergic reaction with puffiness of the throat, with sweating.",EMERGENCY
+5135,"A patient has ongoing lower back ache, with reduced appetite.",CONSULTATION
+5136,"A patient has ongoing lower back discomfort, with reduced appetite.",CONSULTATION
+5137,"Patient reports sudden facial drooping and unclear speech, with passing out.",EMERGENCY
+5138,"Patient reports sudden facial drooping and unclear speech, with temporary loss of consciousness.",EMERGENCY
+5139,"person is unresponsive and not responding normally, after a serious injury.",EMERGENCY
+5140,"person is not conscious and not responding normally, after a serious injury.",EMERGENCY
+5141,"The person reports severe allergic reaction with swelling of the throat, with passing out.",EMERGENCY
+5142,"The person reports severe allergic reaction with swelling of the throat, with temporary loss of consciousness.",EMERGENCY
+5143,"The person reports severe allergic reaction with inflammation of the throat, with fainting.",EMERGENCY
+5144,"The user says heavy blood loss that does not stop with firm pressure, with fainting.",EMERGENCY
+5145,"The user says serious bleeding that does not stop with firm pressure, with fainting.",EMERGENCY
+5146,"The user says severe blood loss that does not stop with firm pressure, with fainting.",EMERGENCY
+5147,"A patient has severe allergic reaction with trouble breathing, with severe ache.",EMERGENCY
+5148,"A patient has severe allergic reaction with trouble breathing, with severe discomfort.",EMERGENCY
+5149,"The person reports persistent loose stools, with mild fever.",CONSULTATION
+5150,"The person reports persistent frequent watery stools, with mild fever.",CONSULTATION
+5151,"The person reports persistent diarrhea, with mild raised temperature.",CONSULTATION
+5152,"The person reports severe chest discomfort with heavy sweating, getting worse quickly.",EMERGENCY
+5153,"The person reports severe pain in the chest with heavy sweating, getting worse quickly.",EMERGENCY
+5154,"The person reports severe chest ache with heavy sweating, getting worse quickly.",EMERGENCY
+5155,"A patient has sudden severe head pain with confusion and weakness, with trouble speaking.",EMERGENCY
+5156,"A patient has sudden severe pain in the head with confusion and weakness, with trouble speaking.",EMERGENCY
+5157,"The person reports joint ache continuing for weeks, without improving.",CONSULTATION
+5158,"The person reports pain in a joint continuing for weeks, without improving.",CONSULTATION
+5159,"The person reports joint discomfort continuing for weeks, without improving.",CONSULTATION
+5160,"A patient has persistent loose stools, for several days.",CONSULTATION
+5161,"A patient has persistent frequent watery stools, for several days.",CONSULTATION
+5162,"The person reports ongoing tooth ache, for more than a week.",CONSULTATION
+5163,"The person reports ongoing tooth discomfort, for more than a week.",CONSULTATION
+5164,"The person reports joint ache continuing for weeks, with mild discomfort.",CONSULTATION
+5165,"The person reports pain in a joint continuing for weeks, with mild discomfort.",CONSULTATION
+5166,"The person reports joint discomfort continuing for weeks, with mild discomfort.",CONSULTATION
+5167,"Patient reports joint ache continuing for weeks, for more than a week.",CONSULTATION
+5168,"Patient reports pain in a joint continuing for weeks, for more than a week.",CONSULTATION
+5169,"Patient reports joint discomfort continuing for weeks, for more than a week.",CONSULTATION
+5170,"The user says minor scrape on the knee, with slight inflammation.",FIRST AID
+5171,"The user says minor scrape on the knee, with slight puffiness.",FIRST AID
+5172,"Patient reports sudden severe difficulty breathing after a possible allergic reaction, during the night.",EMERGENCY
+5173,"Patient reports sudden severe breathlessness after a possible allergic reaction, during the night.",EMERGENCY
+5174,"A patient has mild tension head pain, with no major injury.",FIRST AID
+5175,"A patient has mild tension pain in the head, with no major injury.",FIRST AID
+5176,"The user says severe allergic reaction with inflammation of the throat, with unusual drowsiness.",EMERGENCY
+5177,"The user says severe allergic reaction with puffiness of the throat, with unusual drowsiness.",EMERGENCY
+5178,"Patient reports ongoing lower back ache, without improving.",CONSULTATION
+5179,"Patient reports ongoing lower back discomfort, without improving.",CONSULTATION
+5180,"Patient reports small kitchen wound with bleeding that stops quickly, with mild redness.",FIRST AID
+5181,"Patient reports minor kitchen laceration with bleeding that stops quickly, with mild redness.",FIRST AID
+5182,"Patient reports minor kitchen wound with bleeding that stops quickly, with mild redness.",FIRST AID
+5183,"The person reports joint ache continuing for weeks, mainly in the evening.",CONSULTATION
+5184,"The person reports pain in a joint continuing for weeks, mainly in the evening.",CONSULTATION
+5185,"The person reports joint discomfort continuing for weeks, mainly in the evening.",CONSULTATION
+5186,"Patient reports repeated throwing up over the day, after meals.",CONSULTATION
+5187,"Patient reports repeated being sick over the day, after meals.",CONSULTATION
+5188,"The person reports joint ache continuing for weeks, after meals.",CONSULTATION
+5189,"The person reports pain in a joint continuing for weeks, after meals.",CONSULTATION
+5190,"The person reports joint discomfort continuing for weeks, after meals.",CONSULTATION
+5191,"The user says sudden severe difficulty breathing after a possible allergic reaction, after a serious injury.",EMERGENCY
+5192,"The user says sudden severe breathlessness after a possible allergic reaction, after a serious injury.",EMERGENCY
+5193,"A patient has possible stroke symptoms beginning suddenly, with severe discomfort.",EMERGENCY
+5194,"A patient has sudden symptoms suggestive of stroke beginning suddenly, with severe discomfort.",EMERGENCY
+5195,"persistent loose stools, with occasional discomfort.",CONSULTATION
+5196,"persistent frequent watery stools, with occasional discomfort.",CONSULTATION
+5197,"mild stomach discomfort after a meal, without difficulty breathing.",FIRST AID
+5198,"mild stomach discomfort after a meal, without breathlessness.",FIRST AID
+5199,"A patient has possible stroke symptoms beginning suddenly, with unusual drowsiness.",EMERGENCY
+5200,"A patient has sudden symptoms suggestive of stroke beginning suddenly, with unusual drowsiness.",EMERGENCY
+5201,"Patient reports recurrent dizziness without passing out, for more than a week.",CONSULTATION
+5202,"Patient reports recurrent dizziness without temporary loss of consciousness, for more than a week.",CONSULTATION
+5203,"Patient reports recurrent feeling dizzy without fainting, for more than a week.",CONSULTATION
+5204,"The person reports skin skin eruption that is not improving, gradually worsening.",CONSULTATION
+5205,"The person reports skin skin outbreak that is not improving, gradually worsening.",CONSULTATION
+5206,"The user says joint ache continuing for weeks, with tiredness.",CONSULTATION
+5207,"The user says pain in a joint continuing for weeks, with tiredness.",CONSULTATION
+5208,"The user says joint discomfort continuing for weeks, with tiredness.",CONSULTATION
+5209,"severe chest pressure with breathlessness, with confusion.",EMERGENCY
+5210,"severe chest pressure with difficulty breathing, with confusion.",EMERGENCY
+5211,"The user says person is unconscious and not responding normally, with passing out.",EMERGENCY
+5212,"The user says person is unconscious and not responding normally, with temporary loss of consciousness.",EMERGENCY
+5213,"The user says person is unresponsive and not responding normally, with fainting.",EMERGENCY
+5214,"mild cough for one or two days, with slight inflammation.",FIRST AID
+5215,"mild cough for one or two days, with slight puffiness.",FIRST AID
+5216,"mild coughing for one or two days, with slight swelling.",FIRST AID
+5217,"Patient reports possible stroke symptoms beginning suddenly, during the night.",EMERGENCY
+5218,"Patient reports sudden symptoms suggestive of stroke beginning suddenly, during the night.",EMERGENCY
+5219,"Patient reports person is unresponsive and not responding normally, after a serious injury.",EMERGENCY
+5220,"Patient reports person is not conscious and not responding normally, after a serious injury.",EMERGENCY
+5221,"The person reports persistent loose stools, without improving.",CONSULTATION
+5222,"The person reports persistent frequent watery stools, without improving.",CONSULTATION
+5223,"The person reports minor insect bite with mild itchiness, with mild discomfort.",FIRST AID
+5224,"The person reports minor insect bite with mild itchy sensation, with mild discomfort.",FIRST AID
+5225,"The user says repeated throwing up over the day, without improving.",CONSULTATION
+5226,"The user says repeated being sick over the day, without improving.",CONSULTATION
+5227,"The person reports ongoing tooth ache, with tiredness.",CONSULTATION
+5228,"The person reports ongoing tooth discomfort, with tiredness.",CONSULTATION
+5229,"A patient has major injury with uncontrolled blood loss, with confusion.",EMERGENCY
+5230,"A patient has major injury with uncontrolled active bleeding, with confusion.",EMERGENCY
+5231,"The person reports major injury with uncontrolled blood loss, with unusual drowsiness.",EMERGENCY
+5232,"The person reports major injury with uncontrolled active bleeding, with unusual drowsiness.",EMERGENCY
+5233,"A patient has coughing continuing for several weeks, mainly in the evening.",CONSULTATION
+5234,"A patient has repeated coughing continuing for several weeks, mainly in the evening.",CONSULTATION
+5235,"mild coughing for one or two days, after a minor incident.",FIRST AID
+5236,"mild repeated coughing for one or two days, after a minor incident.",FIRST AID
+5237,"The person reports small superficial wound on a finger, for a short time.",FIRST AID
+5238,"The person reports small superficial laceration on a finger, for a short time.",FIRST AID
+5239,"mild cold symptoms without difficulty breathing, improving gradually.",FIRST AID
+5240,"mild cold symptoms without breathlessness, improving gradually.",FIRST AID
+5241,"possible stroke symptoms beginning suddenly, with marked weakness.",EMERGENCY
+5242,"sudden symptoms suggestive of stroke beginning suddenly, with marked weakness.",EMERGENCY
+5243,"The user says common cold with sneezing, with slight inflammation.",FIRST AID
+5244,"The user says common cold with sneezing, with slight puffiness.",FIRST AID
+5245,"The person reports small superficial thermal injury from brief contact with a warm object, with mild redness.",FIRST AID
+5246,"The person reports small superficial skin burn from brief contact with a warm object, with mild redness.",FIRST AID
+5247,"A patient has coughing continuing for several weeks, with mild discomfort.",CONSULTATION
+5248,"A patient has repeated coughing continuing for several weeks, with mild discomfort.",CONSULTATION
+5249,"Patient reports mild coughing for one or two days, after a small bump.",FIRST AID
+5250,"Patient reports mild repeated coughing for one or two days, after a small bump.",FIRST AID
+5251,"Patient reports mild inflammation that persists, with sleep disturbance.",CONSULTATION
+5252,"Patient reports mild puffiness that persists, with sleep disturbance.",CONSULTATION
+5253,"The user says uncontrolled blood loss after a serious injury, with severe discomfort.",EMERGENCY
+5254,"The user says uncontrolled active bleeding after a serious injury, with severe discomfort.",EMERGENCY
+5255,"Reported symptom: mild headache after a long day, without difficulty breathing.",FIRST AID
+5256,"Reported symptom: mild headache after a long day, without breathlessness.",FIRST AID
+5257,"Reported symptom: mild head pain after a long day, without breathing difficulty.",FIRST AID
+5258,"Patient reports joint pain continuing for weeks, with mild raised temperature.",CONSULTATION
+5259,"Patient reports joint pain continuing for weeks, with mild high body temperature.",CONSULTATION
+5260,"Patient reports joint ache continuing for weeks, with mild fever.",CONSULTATION
+5261,"Reported symptom: small superficial thermal injury from brief contact with a warm object, with slight swelling.",FIRST AID
+5262,"Reported symptom: small superficial skin burn from brief contact with a warm object, with slight swelling.",FIRST AID
+5263,"Reported symptom: small superficial burn from brief contact with a warm object, with slight inflammation.",FIRST AID
+5264,"Patient reports mild sun-related skin burn, with slight swelling.",FIRST AID
+5265,"Patient reports mild skin irritation from sun exposure, with slight swelling.",FIRST AID
+5266,"Patient reports mild sunburn, with slight inflammation.",FIRST AID
+5267,"The user says uncontrolled blood loss after a serious injury, with sweating.",EMERGENCY
+5268,"The user says uncontrolled active bleeding after a serious injury, with sweating.",EMERGENCY
+5269,"The user says mild stomach discomfort after a meal, with slight inflammation.",FIRST AID
+5270,"The user says mild stomach discomfort after a meal, with slight puffiness.",FIRST AID
+5271,"A patient has joint ache continuing for weeks, keeps coming back.",CONSULTATION
+5272,"A patient has pain in a joint continuing for weeks, keeps coming back.",CONSULTATION
+5273,"A patient has joint discomfort continuing for weeks, keeps coming back.",CONSULTATION
+5274,"The user says small kitchen wound with bleeding that stops quickly, without heavy bleeding.",FIRST AID
+5275,"The user says minor kitchen laceration with bleeding that stops quickly, without heavy bleeding.",FIRST AID
+5276,"The user says minor kitchen wound with bleeding that stops quickly, without heavy bleeding.",FIRST AID
+5277,"A patient has mild cold symptoms without difficulty breathing, after brief exposure.",FIRST AID
+5278,"A patient has mild cold symptoms without breathlessness, after brief exposure.",FIRST AID
+5279,"joint ache continuing for weeks, keeps coming back.",CONSULTATION
+5280,"pain in a joint continuing for weeks, keeps coming back.",CONSULTATION
+5281,"joint discomfort continuing for weeks, keeps coming back.",CONSULTATION
+5282,"A patient has new seizure lasting several minutes, with severe breathlessness.",EMERGENCY
+5283,"A patient has new seizure lasting several minutes, with severe difficulty breathing.",EMERGENCY
+5284,"minor insect bite with mild itchiness, with discomfort that is manageable.",FIRST AID
+5285,"minor insect bite with mild itchy sensation, with discomfort that is manageable.",FIRST AID
+5286,"A patient has minor insect bite with mild itchiness, for a short time.",FIRST AID
+5287,"A patient has minor insect bite with mild itchy sensation, for a short time.",FIRST AID
+5288,"The user says mild throat irritation for one day, with slight inflammation.",FIRST AID
+5289,"The user says mild throat irritation for one day, with slight puffiness.",FIRST AID
+5290,"A patient has mild inflammation that persists, with reduced appetite.",CONSULTATION
+5291,"A patient has mild puffiness that persists, with reduced appetite.",CONSULTATION
+5292,"The person reports sudden severe headache with confusion and weakness, with passing out.",EMERGENCY
+5293,"The person reports sudden severe headache with confusion and weakness, with temporary loss of consciousness.",EMERGENCY
+5294,"The person reports sudden severe head pain with confusion and weakness, with fainting.",EMERGENCY
+5295,"The user says mild sun-related skin burn, with mild redness.",FIRST AID
+5296,"The user says mild skin irritation from sun exposure, with mild redness.",FIRST AID
+5297,"The user says mild cold symptoms without difficulty breathing, with discomfort that is manageable.",FIRST AID
+5298,"The user says mild cold symptoms without breathlessness, with discomfort that is manageable.",FIRST AID
+5299,"sudden severe head pain with confusion and weakness, after a serious injury.",EMERGENCY
+5300,"sudden severe pain in the head with confusion and weakness, after a serious injury.",EMERGENCY
+5301,"The user says cough with mild raised temperature continuing for several days, with sleep disturbance.",CONSULTATION
+5302,"The user says cough with mild high body temperature continuing for several days, with sleep disturbance.",CONSULTATION
+5303,"The user says coughing with mild fever continuing for several days, with sleep disturbance.",CONSULTATION
+5304,"The user says sudden severe difficulty breathing after a possible allergic reaction, during the night.",EMERGENCY
+5305,"The user says sudden severe breathlessness after a possible allergic reaction, during the night.",EMERGENCY
+5306,"Patient reports person is unresponsive and not responding normally, with a rapidly worsening condition.",EMERGENCY
+5307,"Patient reports person is not conscious and not responding normally, with a rapidly worsening condition.",EMERGENCY
+5308,"A patient has minor ankle soreness after a simple twist with no severe symptoms, with slight inflammation.",FIRST AID
+5309,"A patient has minor ankle soreness after a simple twist with no severe symptoms, with slight puffiness.",FIRST AID
+5310,"A patient has heavy blood loss that does not stop with firm pressure, started suddenly.",EMERGENCY
+5311,"A patient has serious bleeding that does not stop with firm pressure, started suddenly.",EMERGENCY
+5312,"A patient has severe blood loss that does not stop with firm pressure, started suddenly.",EMERGENCY
+5313,"joint ache continuing for weeks, for more than a week.",CONSULTATION
+5314,"pain in a joint continuing for weeks, for more than a week.",CONSULTATION
+5315,"joint discomfort continuing for weeks, for more than a week.",CONSULTATION
+5316,"The user says severe chest discomfort spreading to the arm with sweating, started suddenly.",EMERGENCY
+5317,"The user says severe pain in the chest spreading to the arm with sweating, started suddenly.",EMERGENCY
+5318,"The user says severe chest ache spreading to the arm with sweating, started suddenly.",EMERGENCY
+5319,"A patient has severe chest pain with heavy sweating, with severe breathlessness.",EMERGENCY
+5320,"A patient has severe chest pain with heavy sweating, with severe difficulty breathing.",EMERGENCY
+5321,"A patient has severe chest discomfort with heavy sweating, with severe shortness of breath.",EMERGENCY
+5322,"recurrent dizziness without passing out, for several days.",CONSULTATION
+5323,"recurrent dizziness without temporary loss of consciousness, for several days.",CONSULTATION
+5324,"recurrent feeling dizzy without fainting, for several days.",CONSULTATION
+5325,"mild raised temperature with tiredness, with symptoms staying mild.",FIRST AID
+5326,"mild high body temperature with tiredness, with symptoms staying mild.",FIRST AID
+5327,"The person reports ongoing tooth ache, with occasional discomfort.",CONSULTATION
+5328,"The person reports ongoing tooth discomfort, with occasional discomfort.",CONSULTATION
+5329,"A patient has small contusion after a minor bump, with symptoms staying mild.",FIRST AID
+5330,"A patient has small bruised area after a minor bump, with symptoms staying mild.",FIRST AID
+5331,"Patient reports small kitchen wound with bleeding that stops quickly, with mild discomfort.",FIRST AID
+5332,"Patient reports minor kitchen laceration with bleeding that stops quickly, with mild discomfort.",FIRST AID
+5333,"Patient reports minor kitchen wound with bleeding that stops quickly, with mild discomfort.",FIRST AID
+5334,"The person reports severe chest discomfort spreading to the arm with sweating, with confusion.",EMERGENCY
+5335,"The person reports severe pain in the chest spreading to the arm with sweating, with confusion.",EMERGENCY
+5336,"The person reports severe chest ache spreading to the arm with sweating, with confusion.",EMERGENCY
+5337,"The person reports mild raised temperature with tiredness, for a short time.",FIRST AID
+5338,"The person reports mild high body temperature with tiredness, for a short time.",FIRST AID
+5339,"The person reports raised temperature that keeps returning, with reduced appetite.",CONSULTATION
+5340,"The person reports high body temperature that keeps returning, with reduced appetite.",CONSULTATION
+5341,"A patient has severe chest pressure with breathlessness, with marked weakness.",EMERGENCY
+5342,"A patient has severe chest pressure with difficulty breathing, with marked weakness.",EMERGENCY
+5343,"Reported symptom: mild inflammation that persists, gradually worsening.",CONSULTATION
+5344,"Reported symptom: mild puffiness that persists, gradually worsening.",CONSULTATION
+5345,"Patient reports mild coughing for one or two days, with mild redness.",FIRST AID
+5346,"Patient reports mild repeated coughing for one or two days, with mild redness.",FIRST AID
+5347,"severe chest pain spreading to the arm with sweating, with severe breathlessness.",EMERGENCY
+5348,"severe chest pain spreading to the arm with sweating, with severe difficulty breathing.",EMERGENCY
+5349,"severe chest discomfort spreading to the arm with sweating, with severe shortness of breath.",EMERGENCY
+5350,"severe chest discomfort with heavy sweating, with severe pain.",EMERGENCY
+5351,"severe pain in the chest with heavy sweating, with severe pain.",EMERGENCY
+5352,"severe chest ache with heavy sweating, with severe pain.",EMERGENCY
+5353,"A patient has small contusion after a minor bump, with mild redness.",FIRST AID
+5354,"A patient has small bruised area after a minor bump, with mild redness.",FIRST AID
+5355,"Patient reports mild muscle soreness after normal activity, with slight inflammation.",FIRST AID
+5356,"Patient reports mild muscle soreness after normal activity, with slight puffiness.",FIRST AID
+5357,"The person reports severe chest discomfort spreading to the arm with sweating, with unusual drowsiness.",EMERGENCY
+5358,"The person reports severe pain in the chest spreading to the arm with sweating, with unusual drowsiness.",EMERGENCY
+5359,"The person reports severe chest ache spreading to the arm with sweating, with unusual drowsiness.",EMERGENCY
+5360,"Reported symptom: severe chest pressure with breathlessness, with severe shortness of breath.",EMERGENCY
+5361,"Reported symptom: severe chest pressure with difficulty breathing, with severe shortness of breath.",EMERGENCY
+5362,"Reported symptom: raised temperature that keeps returning, with tiredness.",CONSULTATION
+5363,"Reported symptom: high body temperature that keeps returning, with tiredness.",CONSULTATION
+5364,"Patient reports uncontrolled blood loss after a serious injury, with severe discomfort.",EMERGENCY
+5365,"Patient reports uncontrolled active bleeding after a serious injury, with severe discomfort.",EMERGENCY
+5366,"The user says minor ankle soreness after a simple twist with no severe symptoms, without difficulty breathing.",FIRST AID
+5367,"The user says minor ankle soreness after a simple twist with no severe symptoms, without breathlessness.",FIRST AID
+5368,"The user says raised temperature that keeps returning, with reduced appetite.",CONSULTATION
+5369,"The user says high body temperature that keeps returning, with reduced appetite.",CONSULTATION
+5370,"The person reports ear ache continuing for several days, during the past few weeks.",CONSULTATION
+5371,"The person reports ear discomfort continuing for several days, during the past few weeks.",CONSULTATION
+5372,"The person reports sudden severe difficulty breathing after a possible allergic reaction, with severe discomfort.",EMERGENCY
+5373,"The person reports sudden severe breathlessness after a possible allergic reaction, with severe discomfort.",EMERGENCY
+5374,"ongoing lower back ache, with tiredness.",CONSULTATION
+5375,"ongoing lower back discomfort, with tiredness.",CONSULTATION
+5376,"A patient has small kitchen wound with bleeding that stops quickly, without loss of consciousness.",FIRST AID
+5377,"A patient has minor kitchen laceration with bleeding that stops quickly, without loss of consciousness.",FIRST AID
+5378,"A patient has minor kitchen wound with bleeding that stops quickly, without loss of consciousness.",FIRST AID
+5379,"The person reports small superficial thermal injury from brief contact with a warm object, after normal daily activity.",FIRST AID
+5380,"The person reports small superficial skin burn from brief contact with a warm object, after normal daily activity.",FIRST AID
+5381,"The user says person is unresponsive and not responding normally, after a serious injury.",EMERGENCY
+5382,"The user says person is not conscious and not responding normally, after a serious injury.",EMERGENCY
+5383,"major injury with uncontrolled blood loss, getting worse quickly.",EMERGENCY
+5384,"major injury with uncontrolled active bleeding, getting worse quickly.",EMERGENCY
+5385,"A patient has joint ache continuing for weeks, after meals.",CONSULTATION
+5386,"A patient has pain in a joint continuing for weeks, after meals.",CONSULTATION
+5387,"A patient has joint discomfort continuing for weeks, after meals.",CONSULTATION
+5388,"The user says mild head pain after a long day, improving gradually.",FIRST AID
+5389,"The user says mild pain in the head after a long day, improving gradually.",FIRST AID
+5390,"A patient has sudden facial drooping and unclear speech, with severe ache.",EMERGENCY
+5391,"A patient has sudden facial drooping and unclear speech, with severe discomfort.",EMERGENCY
+5392,"The user says heavy blood loss that does not stop with firm pressure, started suddenly.",EMERGENCY
+5393,"The user says serious bleeding that does not stop with firm pressure, started suddenly.",EMERGENCY
+5394,"The user says severe blood loss that does not stop with firm pressure, started suddenly.",EMERGENCY
+5395,"The person reports repeated throwing up over the day, for more than a week.",CONSULTATION
+5396,"The person reports repeated being sick over the day, for more than a week.",CONSULTATION
+5397,"severe allergic reaction with swelling of the throat, with passing out.",EMERGENCY
+5398,"severe allergic reaction with swelling of the throat, with temporary loss of consciousness.",EMERGENCY
+5399,"severe allergic reaction with inflammation of the throat, with fainting.",EMERGENCY
+5400,"The user says sudden severe difficulty breathing after a possible allergic reaction, with inability to walk normally.",EMERGENCY
+5401,"The user says sudden severe breathlessness after a possible allergic reaction, with inability to walk normally.",EMERGENCY
+5402,"The person reports repeated throwing up over the day, keeps coming back.",CONSULTATION
+5403,"The person reports repeated being sick over the day, keeps coming back.",CONSULTATION
+5404,"The person reports skin skin eruption that is not improving, despite normal rest.",CONSULTATION
+5405,"The person reports skin skin outbreak that is not improving, despite normal rest.",CONSULTATION
+5406,"The user says possible stroke symptoms beginning suddenly, started suddenly.",EMERGENCY
+5407,"The user says sudden symptoms suggestive of stroke beginning suddenly, started suddenly.",EMERGENCY
+5408,"The person reports possible stroke symptoms beginning suddenly, with a rapidly worsening condition.",EMERGENCY
+5409,"The person reports sudden symptoms suggestive of stroke beginning suddenly, with a rapidly worsening condition.",EMERGENCY
+5410,"heavy blood loss that does not stop with firm pressure, with confusion.",EMERGENCY
+5411,"serious bleeding that does not stop with firm pressure, with confusion.",EMERGENCY
+5412,"severe blood loss that does not stop with firm pressure, with confusion.",EMERGENCY
+5413,"mild coughing for one or two days, with mild discomfort.",FIRST AID
+5414,"mild repeated coughing for one or two days, with mild discomfort.",FIRST AID
+5415,"A patient has small kitchen wound with bleeding that stops quickly, after a minor incident.",FIRST AID
+5416,"A patient has minor kitchen laceration with bleeding that stops quickly, after a minor incident.",FIRST AID
+5417,"A patient has minor kitchen wound with bleeding that stops quickly, after a minor incident.",FIRST AID
+5418,"A patient has ongoing tooth pain, with mild raised temperature.",CONSULTATION
+5419,"A patient has ongoing tooth pain, with mild high body temperature.",CONSULTATION
+5420,"A patient has ongoing tooth ache, with mild fever.",CONSULTATION
+5421,"The person reports possible stroke symptoms beginning suddenly, started suddenly.",EMERGENCY
+5422,"The person reports sudden symptoms suggestive of stroke beginning suddenly, started suddenly.",EMERGENCY
+5423,"The person reports skin skin eruption that is not improving, during the past few weeks.",CONSULTATION
+5424,"The person reports skin skin outbreak that is not improving, during the past few weeks.",CONSULTATION
+5425,"sudden severe head pain with confusion and weakness, during the night.",EMERGENCY
+5426,"sudden severe pain in the head with confusion and weakness, during the night.",EMERGENCY
+5427,"A patient has minor insect bite with mild itching, without heavy blood loss.",FIRST AID
+5428,"A patient has minor insect bite with mild itching, without heavy active bleeding.",FIRST AID
+5429,"A patient has minor insect bite with mild itchiness, without heavy bleeding.",FIRST AID
+5430,"persistent sore throat, with mild raised temperature.",CONSULTATION
+5431,"persistent sore throat, with mild high body temperature.",CONSULTATION
+5432,"mild tension headache, without heavy blood loss.",FIRST AID
+5433,"mild tension headache, without heavy active bleeding.",FIRST AID
+5434,"mild tension head pain, without heavy bleeding.",FIRST AID
+5435,"The user says repeated throwing up over the day, keeps coming back.",CONSULTATION
+5436,"The user says repeated being sick over the day, keeps coming back.",CONSULTATION
+5437,"Patient reports recurrent dizziness without passing out, with occasional discomfort.",CONSULTATION
+5438,"Patient reports recurrent dizziness without temporary loss of consciousness, with occasional discomfort.",CONSULTATION
+5439,"Patient reports recurrent feeling dizzy without fainting, with occasional discomfort.",CONSULTATION
+5440,"Patient reports head pain occurring repeatedly, after meals.",CONSULTATION
+5441,"Patient reports pain in the head occurring repeatedly, after meals.",CONSULTATION
+5442,"Patient reports minor scrape on the knee, without difficulty breathing.",FIRST AID
+5443,"Patient reports minor scrape on the knee, without breathlessness.",FIRST AID
+5444,"The user says possible stroke symptoms beginning suddenly, with marked weakness.",EMERGENCY
+5445,"The user says sudden symptoms suggestive of stroke beginning suddenly, with marked weakness.",EMERGENCY
+5446,"The person reports small superficial thermal injury from brief contact with a warm object, for a short time.",FIRST AID
+5447,"The person reports small superficial skin burn from brief contact with a warm object, for a short time.",FIRST AID
+5448,"The user says joint ache continuing for weeks, with occasional discomfort.",CONSULTATION
+5449,"The user says pain in a joint continuing for weeks, with occasional discomfort.",CONSULTATION
+5450,"The user says joint discomfort continuing for weeks, with occasional discomfort.",CONSULTATION
+5451,"small contusion after a minor bump, for a short time.",FIRST AID
+5452,"small bruised area after a minor bump, for a short time.",FIRST AID
+5453,"Patient reports repeated throwing up over the day, with mild discomfort.",CONSULTATION
+5454,"Patient reports repeated being sick over the day, with mild discomfort.",CONSULTATION
+5455,"raised temperature that keeps returning, with occasional discomfort.",CONSULTATION
+5456,"high body temperature that keeps returning, with occasional discomfort.",CONSULTATION
+5457,"A patient has minor skin irritation from friction, without heavy blood loss.",FIRST AID
+5458,"A patient has minor skin irritation from friction, without heavy active bleeding.",FIRST AID
+5459,"A patient has small kitchen wound with bleeding that stops quickly, after normal daily activity.",FIRST AID
+5460,"A patient has minor kitchen laceration with bleeding that stops quickly, after normal daily activity.",FIRST AID
+5461,"A patient has minor kitchen wound with bleeding that stops quickly, after normal daily activity.",FIRST AID
+5462,"A patient has heavy blood loss that does not stop with firm pressure, after a serious injury.",EMERGENCY
+5463,"A patient has serious bleeding that does not stop with firm pressure, after a serious injury.",EMERGENCY
+5464,"A patient has severe blood loss that does not stop with firm pressure, after a serious injury.",EMERGENCY
+5465,"The user says persistent abdominal ache, with sleep disturbance.",CONSULTATION
+5466,"The user says persistent abdominal discomfort, with sleep disturbance.",CONSULTATION
+5467,"A patient has repeated episodes of heartburn, with mild raised temperature.",CONSULTATION
+5468,"A patient has repeated episodes of heartburn, with mild high body temperature.",CONSULTATION
+5469,"The user says head pain occurring repeatedly, with occasional discomfort.",CONSULTATION
+5470,"The user says pain in the head occurring repeatedly, with occasional discomfort.",CONSULTATION
+5471,"A patient has mild muscle soreness after normal activity, with slight inflammation.",FIRST AID
+5472,"A patient has mild muscle soreness after normal activity, with slight puffiness.",FIRST AID
+5473,"The person reports severe allergic reaction with inflammation of the throat, with confusion.",EMERGENCY
+5474,"The person reports severe allergic reaction with puffiness of the throat, with confusion.",EMERGENCY
+5475,"The user says head pain occurring repeatedly, with sleep disturbance.",CONSULTATION
+5476,"The user says pain in the head occurring repeatedly, with sleep disturbance.",CONSULTATION
+5477,"The user says mild cold symptoms without difficulty breathing, after normal daily activity.",FIRST AID
+5478,"The user says mild cold symptoms without breathlessness, after normal daily activity.",FIRST AID
+5479,"Patient reports small kitchen wound with bleeding that stops quickly, without loss of consciousness.",FIRST AID
+5480,"Patient reports minor kitchen laceration with bleeding that stops quickly, without loss of consciousness.",FIRST AID
+5481,"Patient reports minor kitchen wound with bleeding that stops quickly, without loss of consciousness.",FIRST AID
+5482,"Patient reports skin skin eruption that is not improving, during the past few weeks.",CONSULTATION
+5483,"Patient reports skin skin outbreak that is not improving, during the past few weeks.",CONSULTATION
+5484,"A patient has joint ache continuing for weeks, with sleep disturbance.",CONSULTATION
+5485,"A patient has pain in a joint continuing for weeks, with sleep disturbance.",CONSULTATION
+5486,"A patient has joint discomfort continuing for weeks, with sleep disturbance.",CONSULTATION
+5487,"skin skin eruption that is not improving, gradually worsening.",CONSULTATION
+5488,"skin skin outbreak that is not improving, gradually worsening.",CONSULTATION
+5489,"A patient has raised temperature that keeps returning, keeps coming back.",CONSULTATION
+5490,"A patient has high body temperature that keeps returning, keeps coming back.",CONSULTATION
+5491,"severe chest discomfort spreading to the arm with sweating, with confusion.",EMERGENCY
+5492"severe pain in the chest spreading to the arm with sweating, with confusion.",EMERGENCY
+5493,"severe chest ache spreading to the arm with sweating, with confusion.",EMERGENCY
+5494,"The user says persistent abdominal ache, with reduced appetite.",CONSULTATION
+5495,"The user says persistent abdominal discomfort, with reduced appetite.",CONSULTATION
+5496,"The user says ongoing lower back ache, during the past few weeks.",CONSULTATION
+5497,"The user says ongoing lower back discomfort, during the past few weeks.",CONSULTATION
+5498,"The user says persistent abdominal ache, for several days.",CONSULTATION
+5499,"The user says persistent abdominal discomfort, for several days.",CONSULTATION
+5500,"The user says small superficial wound on a finger, after normal daily activity.",FIRST AID
+5501,"The user says small superficial laceration on a finger, after normal daily activity.",FIRST AID
+5502,"Patient reports mild sun-related skin burn, without heavy bleeding.",FIRST AID
+5503,"Patient reports mild skin irritation from sun exposure, without heavy bleeding.",FIRST AID
+5504,"Patient reports mild sunburn, without heavy blood loss.",FIRST AID
+5505,"The user says severe allergic reaction with swelling of the throat, with passing out.",EMERGENCY
+5506,"The user says severe allergic reaction with swelling of the throat, with temporary loss of consciousness.",EMERGENCY
+5507,"The user says severe allergic reaction with inflammation of the throat, with fainting.",EMERGENCY
+5508,"small superficial wound on a finger, after brief exposure.",FIRST AID
+5509,"small superficial laceration on a finger after brief exposure.",FIRST AID
+5510,"The user says person collapses and cannot be awakened normally, with passing out.",EMERGENCY
+5511,"The user says person collapses and cannot be awakened normally, with temporary loss of consciousness.",EMERGENCY
+5512,"The user says severe allergic reaction with inflammation of the throat, with sweating.",EMERGENCY
+5513,"The user says severe allergic reaction with puffiness of the throat, with sweating.",EMERGENCY
+5514,"The person reports severe difficulty breathing with inability to speak full sentences, with trouble speaking.",EMERGENCY
+5515,"The person reports severe breathlessness with inability to speak full sentences, with trouble speaking.",EMERGENCY
+5516,"The user says minor insect bite with mild itchiness, without loss of consciousness.",FIRST AID
+5517,"The user says minor insect bite with mild itchy sensation, without loss of consciousness.",FIRST AID
+5518,"The person reports mild coughing for one or two days, without loss of consciousness.",FIRST AID
+5519,"The person reports mild repeated coughing for one or two days, without loss of consciousness.",FIRST AID
+5520,"The person reports severe difficulty breathing with inability to speak full sentences, started suddenly.",EMERGENCY
+5521,"The person reports severe breathlessness with inability to speak full sentences, started suddenly.",EMERGENCY
+5522,"Patient reports mild stomach discomfort after a meal, without heavy blood loss.",FIRST AID
+5523,"Patient reports mild stomach discomfort after a meal, without heavy active bleeding.",FIRST AID
+5524,"Patient reports heavy blood loss that does not stop with firm pressure, with unusual drowsiness.",EMERGENCY
+5525,"Patient reports serious bleeding that does not stop with firm pressure, with unusual drowsiness.",EMERGENCY
+5526,"Patient reports severe blood loss that does not stop with firm pressure, with unusual drowsiness.",EMERGENCY
+5527,"The user says small contusion after a minor bump, with mild redness.",FIRST AID
+5528,"The user says small bruised area after a minor bump, with mild redness.",FIRST AID
+5529,"Patient reports ongoing lower back ache, with sleep disturbance.",CONSULTATION
+5530,"Patient reports ongoing lower back discomfort, with sleep disturbance.",CONSULTATION
+5531,"A patient has heavy blood loss that does not stop with firm pressure, with fainting.",EMERGENCY
+5532,"A patient has serious bleeding that does not stop with firm pressure, with fainting.",EMERGENCY
+5533,"A patient has severe blood loss that does not stop with firm pressure, with fainting.",EMERGENCY
+5534,"Patient reports mild cough for one or two days, without heavy blood loss.",FIRST AID
+5535,"Patient reports mild cough for one or two days, without heavy active bleeding.",FIRST AID
+5536,"Patient reports mild coughing for one or two days, without heavy bleeding.",FIRST AID
+5537,"A patient has small superficial thermal injury from brief contact with a warm object, after normal daily activity.",FIRST AID
+5538,"A patient has small superficial skin burn from brief contact with a warm object, after normal daily activity.",FIRST AID
+5539,"Patient reports minor skin irritation from friction, with slight inflammation.",FIRST AID
+5540,"Patient reports minor skin irritation from friction, with slight puffiness.",FIRST AID
+5541,"The user says joint ache continuing for weeks, during the past few weeks.",CONSULTATION
+5542,"The user says pain in a joint continuing for weeks, during the past few weeks.",CONSULTATION
+5543,"The user says joint discomfort continuing for weeks, during the past few weeks.",CONSULTATION
+5544,"A patient has mild head pain after a long day, for a short time.",FIRST AID
+5545,"A patient has mild pain in the head after a long day, for a short time.",FIRST AID
+5546,"Patient reports sudden severe head pain with confusion and weakness, during the night.",EMERGENCY
+5547,"Patient reports sudden severe pain in the head with confusion and weakness, during the night.",EMERGENCY
+5548,"The person reports sudden severe head pain with confusion and weakness, with inability to walk normally.",EMERGENCY
+5549,"The person reports sudden severe pain in the head with confusion and weakness, with inability to walk normally.",EMERGENCY
+5550,"Reported symptom: mild tension head pain, improving gradually.",FIRST AID
+5551,"Reported symptom: mild tension pain in the head, improving gradually.",FIRST AID
+5552,"Patient reports severe allergic reaction with inflammation of the throat, during the night.",EMERGENCY
+5553,"Patient reports severe allergic reaction with puffiness of the throat, during the night.",EMERGENCY
+5554,"The user says uncontrolled blood loss after a serious injury, after a serious injury.",EMERGENCY
+5555,"The user says uncontrolled active bleeding after a serious injury, after a serious injury.",EMERGENCY
+5556,"The person reports ongoing tooth ache, with sleep disturbance.",CONSULTATION
+5557,"The person reports ongoing tooth discomfort, with sleep disturbance.",CONSULTATION
+5558,"Reported symptom: repeated throwing up over the day, despite normal rest.",CONSULTATION
+5559,"Reported symptom: repeated being sick over the day, despite normal rest.",CONSULTATION
+5560,"Reported symptom: severe chest discomfort with heavy sweating, with sweating.",EMERGENCY
+5561,"Reported symptom: severe pain in the chest with heavy sweating, with sweating.",EMERGENCY
+5562,"Reported symptom: severe chest ache with heavy sweating, with sweating.",EMERGENCY
+5563,"Patient reports mild inflammation that persists, despite normal rest.",CONSULTATION
+5564,"Patient reports mild puffiness that persists, despite normal rest.",CONSULTATION
+5565,"The person reports joint pain continuing for weeks, with mild raised temperature.",CONSULTATION
+5566,"The person reports joint pain continuing for weeks, with mild high body temperature.",CONSULTATION
+5567,"The person reports joint ache continuing for weeks, with mild fever.",CONSULTATION
+5568,"The person reports severe chest discomfort spreading to the arm with sweating, getting worse quickly.",EMERGENCY
+5569,"The person reports severe pain in the chest spreading to the arm with sweating, getting worse quickly.",EMERGENCY
+5570,"The person reports severe chest ache spreading to the arm with sweating, getting worse quickly.",EMERGENCY
+5571,"The person reports mild tension head pain, without loss of consciousness.",FIRST AID
+5572,"The person reports mild tension pain in the head, without loss of consciousness.",FIRST AID
+5573,"A patient has small kitchen wound with bleeding that stops quickly, with mild discomfort.",FIRST AID
+5574,"A patient has minor kitchen laceration with bleeding that stops quickly, with mild discomfort.",FIRST AID
+5575,"A patient has minor kitchen wound with bleeding that stops quickly, with mild discomfort.",FIRST AID
+5576,"Reported symptom: mild fever with tiredness, without difficulty breathing.",FIRST AID
+5577,"Reported symptom: mild fever with tiredness, without breathlessness.",FIRST AID
+5578,"Reported symptom: mild raised temperature with tiredness, without breathing difficulty.",FIRST AID
+5579,"The user says severe chest discomfort with heavy sweating, with marked weakness.",EMERGENCY
+5580,"The user says severe pain in the chest with heavy sweating, with marked weakness.",EMERGENCY
+5581,"The user says severe chest ache with heavy sweating, with marked weakness.",EMERGENCY
+5582,"The person reports joint ache continuing for weeks, gradually worsening.",CONSULTATION
+5583,"The person reports pain in a joint continuing for weeks, gradually worsening.",CONSULTATION
+5584,"The person reports joint discomfort continuing for weeks, gradually worsening.",CONSULTATION
+5585,"A patient has sudden severe head pain with confusion and weakness, with sweating.",EMERGENCY
+5586,"A patient has sudden severe pain in the head with confusion and weakness, with sweating.",EMERGENCY
+5587,"Patient reports skin skin eruption that is not improving, with occasional discomfort.",CONSULTATION
+5588,"Patient reports skin skin outbreak that is not improving, with occasional discomfort.",CONSULTATION
+5589,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5590,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5591,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5592,"The person reports new seizure attack lasting several minutes, with inability to walk normally.",EMERGENCY
+5593,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5594,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5595,"Patient reports new seizure attack lasting several minutes, with severe discomfort.",EMERGENCY
+5596,"A patient has repeated seizure attacks without returning to normal awareness, with confusion.",EMERGENCY
+5597,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5598,"Reported symptom: new seizure attack lasting several minutes, with severe pain.",EMERGENCY
+5599,"A patient has repeated seizure attacks without returning to normal awareness, with fainting.",EMERGENCY
+5600,"The person reports new seizure attack lasting several minutes, after a serious injury.",EMERGENCY
+5601,"A patient has repeated seizure attacks without returning to normal awareness, with severe pain.",EMERGENCY
+5602,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5603,"The user says repeated seizure attacks without returning to normal awareness, started suddenly.",EMERGENCY
+5604,"The user says repeated seizure attacks without returning to normal awareness, with fainting.",EMERGENCY
+5605,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5606,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5607,"Reported symptom: repeated seizure attacks without returning to normal awareness, with fainting.",EMERGENCY
+5608,"Reported symptom: new seizure attack lasting several minutes, during the night.",EMERGENCY
+5609,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5610,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5611,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5612,"Reported symptom: new seizure attack lasting several minutes, with inability to walk normally.",EMERGENCY
+5613,"The person reports repeated seizure attacks without returning to normal awareness, with severe discomfort.",EMERGENCY
+5614,"The person reports repeated seizure attacks without returning to normal awareness, with inability to walk normally.",EMERGENCY
+5615,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5616,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5617,"A patient has repeated seizure attacks without returning to normal awareness, with severe discomfort.",EMERGENCY
+5618,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5619,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5620,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5621,"Reported symptom: repeated seizure attacks without returning to normal awareness, with a rapidly worsening condition.",EMERGENCY
+5622,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5623,"Patient reports repeated seizure attacks without returning to normal awareness, with severe shortness of breath.",EMERGENCY
+5624,"The person reports repeated seizure attacks without returning to normal awareness, with severe shortness of breath.",EMERGENCY
+5625,"The user says new seizure attack lasting several minutes, with fainting.",EMERGENCY
+5626,"The person reports new seizure attack lasting several minutes, with confusion.",EMERGENCY
+5627,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5628,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5629,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5630,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5631,"Reported symptom: repeated seizure attacks without returning to normal awareness, after a serious injury.",EMERGENCY
+5632,"A patient has repeated seizure attacks without returning to normal awareness, with a rapidly worsening condition.",EMERGENCY
+5633,"Patient reports repeated seizure attacks without returning to normal awareness, with unusual drowsiness.",EMERGENCY
+5634,"The user says repeated seizure attacks without returning to normal awareness, with marked weakness.",EMERGENCY
+5635,"The user says new seizure attack lasting several minutes, started suddenly.",EMERGENCY
+5636,"A patient has new seizure attack lasting several minutes, with severe shortness of breath.",EMERGENCY
+5637,"A patient has new seizure attack lasting several minutes, started suddenly.",EMERGENCY
+5638,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5639,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5640,"Reported symptom: repeated seizure attacks without returning to normal awareness, with severe discomfort.",EMERGENCY
+5641,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5642,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5643,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5644,"Reported symptom: new seizure attack lasting several minutes, with sweating.",EMERGENCY
+5645,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5646,"Reported symptom: new seizure attack lasting several minutes, with a rapidly worsening condition.",EMERGENCY
+5647,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5648,"The person reports repeated seizure attacks without returning to normal awareness, with marked weakness.",EMERGENCY
+5649,"The user says repeated seizure attacks without returning to normal awareness, during the night.",EMERGENCY
+5650,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5651,"The patient has symptoms concerning for a heart attack, including chest discomfort spreading to the arm and sweating.",EMERGENCY
+5652,"A patient has repeated seizure attacks without returning to normal awareness, with trouble speaking.",EMERGENCY
+5653,"The patient has symptoms concerning for a heart attack, including chest discomfort and sweating.",EMERGENCY
+5654,"The patient reports symptoms that may indicate a heart attack, including chest pressure and sweating.",EMERGENCY
+5655,The person says they think they are having a heart attack and feel short of breath.,EMERGENCY
+5656,"Possible heart attack: sudden chest tightness, nausea, and cold sweating.",EMERGENCY
+5657,The patient describes a suspected myocardial infarction with chest discomfort and breathlessness.,EMERGENCY
+5658,Possible acute myocardial infarction with pressure in the chest and pain spreading to the arm.,EMERGENCY
+5659,"The person reports possible MI (myocardial infarction), with chest heaviness and sweating.",EMERGENCY
+5660,The patient is worried about a heart attack because of sudden chest pressure and dizziness.,EMERGENCY
+5661,"Symptoms concerning for a heart attack include chest discomfort, nausea, and unusual fatigue.",EMERGENCY
+5662,The person reports chest tightness and breathlessness and fears a heart attack.,EMERGENCY
+5663,Possible heart attack symptoms include discomfort spreading from the chest to the jaw.,EMERGENCY
+5664,"The patient reports sudden chest heaviness and pain radiating to the left arm, concerning for a heart attack.",EMERGENCY
+5665,"The person has unexplained sweating, nausea, and chest pressure that may signal a heart attack.",EMERGENCY
+5666,The patient reports a suspected heart attack with upper-body discomfort and shortness of breath.,EMERGENCY
+5667,Possible myocardial infarction: chest discomfort with sudden weakness and sweating.,EMERGENCY
+5668,The person describes pressure-like chest discomfort and says it feels like a heart attack.,EMERGENCY
+5669,"The patient reports a possible heart attack with discomfort in the chest, back, and jaw.",EMERGENCY
+5670,"Symptoms may be consistent with a heart attack: chest pressure, breathlessness, and nausea.",EMERGENCY
+5671,"The person has sudden chest discomfort and feels faint, raising concern for a heart attack.",EMERGENCY
+5672,Possible acute heart attack with chest pressure and pain spreading to one or both arms.,EMERGENCY
+5673,The patient reports severe unexplained breathlessness and sweating with suspected heart attack.,EMERGENCY
+5674,The person says a doctor previously warned them about myocardial infarction risk and now has new chest pressure.,EMERGENCY
+5675,"The patient reports possible MI with chest tightness, nausea, and dizziness.",EMERGENCY
+5676,"Possible heart attack in an older adult with sudden weakness, sweating, and chest discomfort.",EMERGENCY
+5677,The person reports unusual jaw discomfort and shortness of breath and is concerned about a heart attack.,EMERGENCY
+5678,The patient describes a heart attack warning sign: new pressure or squeezing in the chest.,EMERGENCY
+5679,Suspected myocardial infarction with chest discomfort that comes with activity and does not quickly settle.,EMERGENCY
+5680,The person reports chest pressure at rest and believes it could be a heart attack.,EMERGENCY
+5681,"Possible heart attack with nausea, cold sweat, and discomfort in the upper abdomen.",EMERGENCY
+5682,"The patient reports sudden chest tightness and pain extending into the shoulder, concerning for myocardial infarction.",EMERGENCY
+5683,The person says they may be having an MI and feels dizzy with chest pressure.,EMERGENCY
+5684,"The patient reports a possible heart attack with unusual fatigue, nausea, and breathlessness.",EMERGENCY
+5685,Possible heart attack: chest discomfort accompanied by faintness and clammy skin.,EMERGENCY
+5686,The person reports squeezing chest discomfort and fears an acute myocardial infarction.,EMERGENCY
+5687,The patient describes suspected heart attack symptoms that started suddenly while resting.,EMERGENCY
+5688,Possible myocardial infarction with chest pressure spreading to the back and shortness of breath.,EMERGENCY
+5689,The person reports chest heaviness and cold sweating and asks whether it could be a heart attack.,EMERGENCY
+5690,The patient has new chest discomfort with nausea and is concerned about an acute heart attack.,EMERGENCY
+5691,The person reports a suspected heart attack with pressure in the chest and unusual upper-body pain.,EMERGENCY
+5692,"Possible heart attack symptoms with chest discomfort, sweating, and difficulty breathing.",EMERGENCY
+5693,The patient reports sudden pressure in the chest and says they are afraid it is a heart attack.,EMERGENCY
+5694,The person reports suspected acute coronary syndrome with chest pressure and sweating.,EMERGENCY
+5695,Possible acute coronary syndrome: new chest tightness with nausea and breathlessness.,EMERGENCY
+5696,"The patient describes chest pressure and discomfort spreading to the jaw, raising concern for a heart attack.",EMERGENCY
+5697,The person reports sudden unexplained sweating and shortness of breath with suspected heart attack.,EMERGENCY
+5698,Possible heart attack with discomfort in the chest that feels like squeezing or fullness.,EMERGENCY
+5699,The patient reports a possible myocardial infarction with new chest pressure and dizziness.,EMERGENCY
+5700,The person reports chest discomfort and weakness and is worried about an acute heart attack.,EMERGENCY
+5701,"Possible heart attack with pressure or pain in the chest, arm, shoulder, or jaw.",EMERGENCY
+5702,"The patient reports new chest pressure with breathlessness and nausea, concerning for a heart attack.",EMERGENCY
+5703,The person says they may be having a heart attack because of sudden chest heaviness and sweating.,EMERGENCY
+5704,"The person suddenly collapses, is unresponsive, and is not breathing normally; possible cardiac arrest.",EMERGENCY
+5705,Possible cardiac arrest: the person is unconscious and not breathing normally.,EMERGENCY
+5706,"The patient collapses suddenly and does not respond, raising concern for cardiac arrest.",EMERGENCY
+5707,A person is unresponsive and gasping abnormally; possible cardiac arrest emergency.,EMERGENCY
+5708,"Sudden collapse with no normal breathing, concerning for cardiac arrest.",EMERGENCY
+5709,The person reports severe allergic reaction with swelling of the throat with no relief at all.,EMERGENCY
+5710,The user says severe difficulty breathing with blue lips and the person is confused.,EMERGENCY
+5711,The person reports a mild sunburn on the shoulders with only mild discomfort.,FIRST AID
+5712,The patient describes unexplained weight loss over a few months getting slightly worse over time.,CONSULTATION
+5713,Reported symptoms: a small splinter in the palm with only mild discomfort,FIRST AID
+5714,Reported symptoms: a deep wound with visible bone after an accident starting suddenly just now,EMERGENCY
+5715,The user says ongoing lower back pain getting slightly worse over time.,CONSULTATION
+5716,The person reports ongoing trouble sleeping at night getting slightly worse over time.,CONSULTATION
+5717,A patient has severe allergic reaction with swelling of the throat with no relief at all.,EMERGENCY
+5718,The user says a mild nosebleed that stops on its own with no fever.,FIRST AID
+5719,The person reports heavy bleeding that will not stop with pressure and the person cannot speak properly.,EMERGENCY
+5720,A patient has severe difficulty breathing with blue lips and the person is confused.,EMERGENCY
+5721,Reported symptoms: persistent dry cough lasting weeks that keeps coming back,CONSULTATION
+5722,A patient has long-standing fatigue and low energy that keeps coming back.,CONSULTATION
+5723,The patient describes ongoing trouble sleeping at night not relieved by home remedies.,CONSULTATION
+5724,A patient has a seizure lasting more than five minutes and the person is confused.,EMERGENCY
+5725,Reported symptoms: repeated dizziness when standing up mainly in the morning,CONSULTATION
+5726,A patient has persistent sore throat for over two weeks lasting more than a week.,CONSULTATION
+5727,The patient describes heavy bleeding that will not stop with pressure and the person is getting worse.,EMERGENCY
+5728,The patient describes a small scrape on the knee after a fall that is improving slowly.,FIRST AID
+5729,A patient has sudden paralysis of one arm and leg starting suddenly just now.,EMERGENCY
+5730,Patient reports ongoing trouble sleeping at night not relieved by home remedies.,CONSULTATION
+5731,The user says long-standing fatigue and low energy getting slightly worse over time.,CONSULTATION
+5732,Patient reports severe allergic reaction with swelling of the throat and the person is confused.,EMERGENCY
+5733,The patient describes mild muscle soreness after exercise that started today.,FIRST AID
+5734,The user says a deep wound with visible bone after an accident starting suddenly just now.,EMERGENCY
+5735,Patient reports sudden severe chest pain with sweating starting suddenly just now.,EMERGENCY
+5736,Reported symptoms: sudden severe chest pain with sweating with no relief at all,EMERGENCY
+5737,The user says sudden severe chest pain with sweating and needs an ambulance now.,EMERGENCY
+5738,The person reports a mild nosebleed that stops on its own with no fever.,FIRST AID
+5739,The user says persistent skin rash that keeps returning mainly in the morning.,CONSULTATION
+5740,The user says mild heartburn after a heavy meal with only mild discomfort.,FIRST AID
+5741,Patient reports repeated dizziness when standing up lasting more than a week.,CONSULTATION
+5742,Reported symptoms: a minor burn from hot water on the hand after normal daily activity,FIRST AID
+5743,Reported symptoms: a seizure lasting more than five minutes and needs an ambulance now,EMERGENCY
+5744,A patient has a minor bruise after bumping a table with no other symptoms.,FIRST AID
+5745,The person reports severe difficulty breathing with blue lips with no relief at all.,EMERGENCY
+5746,The user says recurring acid reflux at night mainly in the morning.,CONSULTATION
+5747,The patient describes a deep wound with visible bone after an accident and the person cannot speak properly.,EMERGENCY
+5748,The user says a minor burn from hot water on the hand with only mild discomfort.,FIRST AID
+5749,Reported symptoms: suspected poisoning with confusion and vomiting and needs an ambulance now,EMERGENCY
+5750,Reported symptoms: persistent sore throat for over two weeks mainly in the morning,CONSULTATION
+5751,The patient describes a seizure lasting more than five minutes and the person cannot speak properly.,EMERGENCY
+5752,A patient has a small scrape on the knee after a fall that started today.,FIRST AID
+5753,The user says persistent dry cough lasting weeks not relieved by home remedies.,CONSULTATION
+5754,A patient has mild muscle soreness after exercise with only mild discomfort.,FIRST AID
+5755,A patient has mild heartburn after a heavy meal with only mild discomfort.,FIRST AID
+5756,Patient reports a blister on the heel from new shoes with only mild discomfort.,FIRST AID
+5757,The person reports a mild sunburn on the shoulders that started today.,FIRST AID
+5758,A patient has recurring migraine headaches not relieved by home remedies.,CONSULTATION
+5759,The user says a deep wound with visible bone after an accident and the person cannot speak properly.,EMERGENCY
+5760,The patient describes severe difficulty breathing with blue lips and needs an ambulance now.,EMERGENCY
+5761,The user says repeated dizziness when standing up lasting more than a week.,CONSULTATION
+5762,The person reports persistent dry cough lasting weeks getting slightly worse over time.,CONSULTATION
+5763,The patient describes mild heartburn after a heavy meal with no other symptoms.,FIRST AID
+5764,Reported symptoms: long-standing fatigue and low energy affecting daily routine,CONSULTATION
+5765,A patient has suspected poisoning with confusion and vomiting and the person cannot speak properly.,EMERGENCY
+5766,A patient has a small scrape on the knee after a fall with only mild discomfort.,FIRST AID
+5767,Reported symptoms: mild heartburn after a heavy meal after normal daily activity,FIRST AID
+5768,The person reports a mild sprained ankle with slight swelling with no fever.,FIRST AID
+5769,The patient describes a blister on the heel from new shoes after normal daily activity.,FIRST AID
+5770,The person reports unexplained weight loss over a few months affecting daily routine.,CONSULTATION
+5771,The user says a minor bruise after bumping a table with only mild discomfort.,FIRST AID
+5772,The user says ongoing lower back pain mainly in the morning.,CONSULTATION
+5773,A patient has persistent skin rash that keeps returning not relieved by home remedies.,CONSULTATION
+5774,The patient describes severe difficulty breathing with blue lips and the person cannot speak properly.,EMERGENCY
+5775,The patient describes long-standing fatigue and low energy affecting daily routine.,CONSULTATION
+5776,Reported symptoms: sudden loss of consciousness starting suddenly just now,EMERGENCY
+5777,Patient reports a minor insect bite with local itching after normal daily activity.,FIRST AID
+5778,The person reports a small splinter in the palm with no fever.,FIRST AID
+5779,The patient describes sudden severe chest pain with sweating with no relief at all.,EMERGENCY
+5780,The user says a mild sprained ankle with slight swelling that is improving slowly.,FIRST AID
+5781,The patient describes a mild sprained ankle with slight swelling after normal daily activity.,FIRST AID
+5782,The person reports persistent skin rash that keeps returning mainly in the morning.,CONSULTATION
+5783,Patient reports repeated dizziness when standing up that keeps coming back.,CONSULTATION
+5784,A patient has sudden loss of consciousness and the person cannot speak properly.,EMERGENCY
+5785,The person reports a deep wound with visible bone after an accident and the person cannot speak properly.,EMERGENCY
+5786,The user says sudden severe headache with stiff neck and vomiting and the person is confused.,EMERGENCY
+5787,A patient has sudden slurred speech and facial drooping and the person is getting worse.,EMERGENCY
+5788,The patient describes a minor burn from hot water on the hand with no other symptoms.,FIRST AID
+5789,A patient has a mild sunburn on the shoulders that is improving slowly.,FIRST AID
+5790,The patient describes sudden severe chest pain with sweating starting suddenly just now.,EMERGENCY
+5791,A patient has unexplained weight loss over a few months affecting daily routine.,CONSULTATION
+5792,The patient describes unexplained weight loss over a few months lasting more than a week.,CONSULTATION
+5793,The person reports mild muscle soreness after exercise with no fever.,FIRST AID
+5794,The person reports suspected poisoning with confusion and vomiting and the person is getting worse.,EMERGENCY
+5795,The person reports recurring acid reflux at night mainly in the morning.,CONSULTATION
+5796,The patient describes long-standing fatigue and low energy that keeps coming back.,CONSULTATION
+5797,A patient has long-standing fatigue and low energy lasting more than a week.,CONSULTATION
+5798,Patient reports sudden severe chest pain with sweating and needs an ambulance now.,EMERGENCY
+5799,Patient reports sudden slurred speech and facial drooping and the person is confused.,EMERGENCY
+5800,Reported symptoms: ongoing trouble sleeping at night getting slightly worse over time,CONSULTATION
+5801,The person reports heavy bleeding that will not stop with pressure starting suddenly just now.,EMERGENCY
+5802,Patient reports sudden severe headache with stiff neck and vomiting starting suddenly just now.,EMERGENCY
+5803,The user says a small splinter in the palm after normal daily activity.,FIRST AID
+5804,The user says suspected poisoning with confusion and vomiting and needs an ambulance now.,EMERGENCY
+5805,The user says a mild sunburn on the shoulders with no fever.,FIRST AID
+5806,Patient reports persistent skin rash that keeps returning mainly in the morning.,CONSULTATION
+5807,Reported symptoms: severe allergic reaction with swelling of the throat and the person is confused,EMERGENCY
+5808,The person reports long-standing fatigue and low energy mainly in the morning.,CONSULTATION
+5809,The patient describes persistent sore throat for over two weeks lasting more than a week.,CONSULTATION
+5810,The patient describes mild heartburn after a heavy meal with only mild discomfort.,FIRST AID
+5811,A patient has a deep wound with visible bone after an accident and the person cannot speak properly.,EMERGENCY
+5812,Reported symptoms: severe difficulty breathing with blue lips and needs an ambulance now,EMERGENCY
+5813,A patient has a mild sunburn on the shoulders with no other symptoms.,FIRST AID
+5814,The user says severe burns covering a large area of the body and the person cannot speak properly.,EMERGENCY
+5815,The patient describes severe burns covering a large area of the body and needs an ambulance now.,EMERGENCY
+5816,A patient has persistent dry cough lasting weeks that keeps coming back.,CONSULTATION
+5817,A patient has mild heartburn after a heavy meal that started today.,FIRST AID
+5818,The person reports persistent sore throat for over two weeks lasting more than a week.,CONSULTATION
+5819,The user says recurring acid reflux at night affecting daily routine.,CONSULTATION
+5820,Patient reports suspected poisoning with confusion and vomiting and the person is getting worse.,EMERGENCY
+5821,The patient describes severe allergic reaction with swelling of the throat and the person is getting worse.,EMERGENCY
+5822,A patient has ongoing lower back pain not relieved by home remedies.,CONSULTATION
+5823,The patient describes persistent dry cough lasting weeks lasting more than a week.,CONSULTATION
+5824,The person reports persistent dry cough lasting weeks mainly in the morning.,CONSULTATION
+5825,Reported symptoms: ongoing knee pain when climbing stairs not relieved by home remedies,CONSULTATION
+5826,A patient has ongoing lower back pain that keeps coming back.,CONSULTATION
+5827,The patient describes frequent urination with mild burning that keeps coming back.,CONSULTATION
+5828,The patient describes mild muscle soreness after exercise with no other symptoms.,FIRST AID
+5829,Patient reports recurring acid reflux at night that keeps coming back.,CONSULTATION
+5830,A patient has persistent dry cough lasting weeks affecting daily routine.,CONSULTATION
+5831,Patient reports a minor insect bite with local itching with no fever.,FIRST AID
+5832,The user says sudden paralysis of one arm and leg with no relief at all.,EMERGENCY
+5833,Reported symptoms: a mild sprained ankle with slight swelling with no other symptoms,FIRST AID
+5834,The user says heavy bleeding that will not stop with pressure and the person is getting worse.,EMERGENCY
+5835,The person reports severe burns covering a large area of the body and the person is confused.,EMERGENCY
+5836,Reported symptoms: severe burns covering a large area of the body and the person cannot speak properly,EMERGENCY
+5837,Reported symptoms: a deep wound with visible bone after an accident and needs an ambulance now,EMERGENCY
+5838,Patient reports severe difficulty breathing with blue lips and needs an ambulance now.,EMERGENCY
+5839,The patient describes unexplained weight loss over a few months not relieved by home remedies.,CONSULTATION
+5840,The person reports mild muscle soreness after exercise that started today.,FIRST AID
+5841,The user says a mild sunburn on the shoulders after normal daily activity.,FIRST AID
+5842,Patient reports a mild sunburn on the shoulders that is improving slowly.,FIRST AID
+5843,A patient has recurring acid reflux at night lasting more than a week.,CONSULTATION
+5844,A patient has a mild nosebleed that stops on its own with only mild discomfort.,FIRST AID
+5845,The patient describes repeated dizziness when standing up lasting more than a week.,CONSULTATION
+5846,The person reports a minor insect bite with local itching with only mild discomfort.,FIRST AID
+5847,The person reports a small scrape on the knee after a fall with only mild discomfort.,FIRST AID
+5848,The patient describes a mild nosebleed that stops on its own that started today.,FIRST AID
+5849,Patient reports ongoing trouble sleeping at night mainly in the morning.,CONSULTATION
+5850,The user says a minor bruise after bumping a table with no other symptoms.,FIRST AID
+5851,The user says a blister on the heel from new shoes that started today.,FIRST AID
+5852,A patient has sudden severe headache with stiff neck and vomiting and the person is confused.,EMERGENCY
+5853,The person reports a minor insect bite with local itching after normal daily activity.,FIRST AID
+5854,A patient has a minor bruise after bumping a table that started today.,FIRST AID
+5855,Patient reports severe burns covering a large area of the body and the person is getting worse.,EMERGENCY
+5856,The user says recurring migraine headaches not relieved by home remedies.,CONSULTATION
+5857,Reported symptoms: a minor burn from hot water on the hand with no fever,FIRST AID
+5858,The person reports a mild nosebleed that stops on its own that is improving slowly.,FIRST AID
+5859,A patient has ongoing trouble sleeping at night not relieved by home remedies.,CONSULTATION
+5860,The user says sudden severe headache with stiff neck and vomiting starting suddenly just now.,EMERGENCY
+5861,The user says a small splinter in the palm that started today.,FIRST AID
+5862,The person reports a small paper cut on the finger with no other symptoms.,FIRST AID
+5863,Patient reports sudden paralysis of one arm and leg and the person is getting worse.,EMERGENCY
+5864,The person reports a mild nosebleed that stops on its own with no other symptoms.,FIRST AID
+5865,The person reports sudden paralysis of one arm and leg starting suddenly just now.,EMERGENCY
+5866,The person reports sudden severe headache with stiff neck and vomiting and the person cannot speak properly.,EMERGENCY
+5867,The patient describes heavy bleeding that will not stop with pressure and the person is confused.,EMERGENCY
+5868,The patient describes long-standing fatigue and low energy getting slightly worse over time.,CONSULTATION
+5869,Reported symptoms: a minor burn from hot water on the hand with no other symptoms,FIRST AID
+5870,The person reports sudden severe chest pain with sweating and the person is confused.,EMERGENCY
+5871,Reported symptoms: a blister on the heel from new shoes after normal daily activity,FIRST AID
+5872,A patient has a mild nosebleed that stops on its own that is improving slowly.,FIRST AID
+5873,The user says mild muscle soreness after exercise with no other symptoms.,FIRST AID
+5874,Reported symptoms: heavy bleeding that will not stop with pressure with no relief at all,EMERGENCY
+5875,The person reports persistent skin rash that keeps returning that keeps coming back.,CONSULTATION
+5876,The patient describes suspected poisoning with confusion and vomiting and the person is confused.,EMERGENCY
+5877,Reported symptoms: a minor bruise after bumping a table with only mild discomfort,FIRST AID
+5878,The patient describes persistent sore throat for over two weeks affecting daily routine.,CONSULTATION
+5879,The person reports a small splinter in the palm with no other symptoms.,FIRST AID
+5880,Reported symptoms: a small paper cut on the finger with only mild discomfort,FIRST AID
+5881,A patient has severe burns covering a large area of the body and the person is getting worse.,EMERGENCY
+5882,Reported symptoms: unexplained weight loss over a few months that keeps coming back,CONSULTATION
+5883,A patient has a minor burn from hot water on the hand that started today.,FIRST AID
+5884,Patient reports persistent skin rash that keeps returning affecting daily routine.,CONSULTATION
+5885,The patient describes a small splinter in the palm with no other symptoms.,FIRST AID
+5886,Reported symptoms: a mild nosebleed that stops on its own with no fever,FIRST AID
+5887,A patient has ongoing knee pain when climbing stairs getting slightly worse over time.,CONSULTATION
+5888,A patient has a minor burn from hot water on the hand with only mild discomfort.,FIRST AID
+5889,The patient describes sudden loss of consciousness and the person is confused.,EMERGENCY
+5890,Reported symptoms: a minor bruise after bumping a table with no other symptoms,FIRST AID
+5891,Reported symptoms: long-standing fatigue and low energy mainly in the morning,CONSULTATION
+5892,The patient describes ongoing lower back pain that keeps coming back.,CONSULTATION
+5893,The patient describes sudden severe headache with stiff neck and vomiting and the person is getting worse.,EMERGENCY
+5894,The patient describes severe burns covering a large area of the body starting suddenly just now.,EMERGENCY
+5895,Reported symptoms: unexplained weight loss over a few months lasting more than a week,CONSULTATION
+5896,The user says ongoing trouble sleeping at night not relieved by home remedies.,CONSULTATION
+5897,The patient describes severe allergic reaction with swelling of the throat and the person cannot speak properly.,EMERGENCY
+5898,The user says a minor bruise after bumping a table after normal daily activity.,FIRST AID
+5899,The person reports suspected poisoning with confusion and vomiting and needs an ambulance now.,EMERGENCY
+5900,Reported symptoms: ongoing lower back pain mainly in the morning,CONSULTATION
+5901,Reported symptoms: sudden paralysis of one arm and leg with no relief at all,EMERGENCY
+5902,The patient describes a minor bruise after bumping a table with no fever.,FIRST AID
+5903,The patient describes a small splinter in the palm that is improving slowly.,FIRST AID
+5904,The person reports a seizure lasting more than five minutes starting suddenly just now.,EMERGENCY
+5905,The user says severe allergic reaction with swelling of the throat and the person is getting worse.,EMERGENCY
+5906,A patient has ongoing lower back pain getting slightly worse over time.,CONSULTATION
+5907,The patient describes severe difficulty breathing with blue lips with no relief at all.,EMERGENCY
+5908,The patient describes unexplained weight loss over a few months affecting daily routine.,CONSULTATION
+5909,Patient reports a deep wound with visible bone after an accident and needs an ambulance now.,EMERGENCY
+5910,A patient has a seizure lasting more than five minutes and needs an ambulance now.,EMERGENCY
+5911,The user says severe difficulty breathing with blue lips starting suddenly just now.,EMERGENCY
+5912,Patient reports sudden severe headache with stiff neck and vomiting and the person is getting worse.,EMERGENCY
+5913,The user says a mild nosebleed that stops on its own with no other symptoms.,FIRST AID
+5914,Reported symptoms: frequent urination with mild burning mainly in the morning,CONSULTATION
+5915,Patient reports unexplained weight loss over a few months that keeps coming back.,CONSULTATION
+5916,The patient describes recurring migraine headaches getting slightly worse over time.,CONSULTATION
+5917,The user says a mild sunburn on the shoulders with no other symptoms.,FIRST AID
+5918,Reported symptoms: a small splinter in the palm that is improving slowly,FIRST AID
+5919,A patient has severe burns covering a large area of the body with no relief at all.,EMERGENCY
+5920,A patient has persistent skin rash that keeps returning lasting more than a week.,CONSULTATION
+5921,The user says persistent dry cough lasting weeks lasting more than a week.,CONSULTATION
+5922,Reported symptoms: ongoing trouble sleeping at night affecting daily routine,CONSULTATION
+5923,Reported symptoms: a small paper cut on the finger with no fever,FIRST AID
+5924,Patient reports ongoing lower back pain that keeps coming back.,CONSULTATION
+5925,The user says sudden slurred speech and facial drooping with no relief at all.,EMERGENCY
+5926,Reported symptoms: recurring migraine headaches that keeps coming back,CONSULTATION
+5927,Patient reports sudden paralysis of one arm and leg with no relief at all.,EMERGENCY
+5928,A patient has persistent skin rash that keeps returning getting slightly worse over time.,CONSULTATION
+5929,The user says severe allergic reaction with swelling of the throat and the person is confused.,EMERGENCY
+5930,The user says ongoing lower back pain affecting daily routine.,CONSULTATION
+5931,Reported symptoms: recurring acid reflux at night not relieved by home remedies,CONSULTATION
+5932,The patient describes a small paper cut on the finger after normal daily activity.,FIRST AID
+5933,The patient describes a seizure lasting more than five minutes and the person is confused.,EMERGENCY
+5934,Patient reports long-standing fatigue and low energy lasting more than a week.,CONSULTATION
+5935,Patient reports severe burns covering a large area of the body and the person is confused.,EMERGENCY
+5936,Patient reports persistent skin rash that keeps returning not relieved by home remedies.,CONSULTATION
+5937,The person reports repeated dizziness when standing up affecting daily routine.,CONSULTATION
+5938,Reported symptoms: recurring migraine headaches not relieved by home remedies,CONSULTATION
+5939,A patient has persistent sore throat for over two weeks getting slightly worse over time.,CONSULTATION
+5940,Patient reports a minor insect bite with local itching with no other symptoms.,FIRST AID
+5941,A patient has sudden paralysis of one arm and leg and the person is confused.,EMERGENCY
+5942,Reported symptoms: heavy bleeding that will not stop with pressure starting suddenly just now,EMERGENCY
+5943,Patient reports persistent dry cough lasting weeks lasting more than a week.,CONSULTATION
+5944,A patient has a small paper cut on the finger with no fever.,FIRST AID
+5945,The patient describes persistent skin rash that keeps returning mainly in the morning.,CONSULTATION
+5946,Patient reports ongoing knee pain when climbing stairs getting slightly worse over time.,CONSULTATION
+5947,A patient has sudden loss of consciousness and needs an ambulance now.,EMERGENCY
+5948,The person reports recurring migraine headaches getting slightly worse over time.,CONSULTATION
+5949,Patient reports a deep wound with visible bone after an accident with no relief at all.,EMERGENCY
+5950,The user says a mild sunburn on the shoulders that is improving slowly.,FIRST AID
+5951,The patient describes a small scrape on the knee after a fall with no fever.,FIRST AID
+5952,The patient describes sudden slurred speech and facial drooping and the person cannot speak properly.,EMERGENCY
+5953,The patient describes severe allergic reaction with swelling of the throat and the person is confused.,EMERGENCY
+5954,The user says persistent skin rash that keeps returning lasting more than a week.,CONSULTATION
+5955,The person reports a blister on the heel from new shoes that is improving slowly.,FIRST AID
+5956,The user says a mild sprained ankle with slight swelling after normal daily activity.,FIRST AID
+5957,A patient has mild muscle soreness after exercise that is improving slowly.,FIRST AID
+5958,The user says mild muscle soreness after exercise that is improving slowly.,FIRST AID
+5959,The patient describes persistent sore throat for over two weeks that keeps coming back.,CONSULTATION
+5960,The user says a minor burn from hot water on the hand with no other symptoms.,FIRST AID
+5961,Reported symptoms: repeated dizziness when standing up getting slightly worse over time,CONSULTATION
+5962,A patient has suspected poisoning with confusion and vomiting with no relief at all.,EMERGENCY
+5963,The patient describes frequent urination with mild burning getting slightly worse over time.,CONSULTATION
+5964,Patient reports a mild sunburn on the shoulders after normal daily activity.,FIRST AID
+5965,A patient has persistent sore throat for over two weeks affecting daily routine.,CONSULTATION
+5966,Reported symptoms: a blister on the heel from new shoes that is improving slowly,FIRST AID
+5967,The user says severe allergic reaction with swelling of the throat starting suddenly just now.,EMERGENCY
+5968,The user says ongoing knee pain when climbing stairs lasting more than a week.,CONSULTATION
+5969,A patient has sudden paralysis of one arm and leg and the person cannot speak properly.,EMERGENCY
+5970,The person reports repeated dizziness when standing up getting slightly worse over time.,CONSULTATION
+5971,The person reports sudden severe chest pain with sweating and the person is getting worse.,EMERGENCY
+5972,Patient reports a blister on the heel from new shoes with no other symptoms.,FIRST AID
+5973,The patient describes severe burns covering a large area of the body with no relief at all.,EMERGENCY
+5974,Reported symptoms: a blister on the heel from new shoes with no other symptoms,FIRST AID
+5975,The patient describes persistent dry cough lasting weeks mainly in the morning.,CONSULTATION
+5976,The user says sudden slurred speech and facial drooping and the person is getting worse.,EMERGENCY
+5977,Reported symptoms: a mild sprained ankle with slight swelling that is improving slowly,FIRST AID
+5978,The patient describes a mild nosebleed that stops on its own with no other symptoms.,FIRST AID
+5979,The user says ongoing lower back pain that keeps coming back.,CONSULTATION
+5980,The patient describes recurring migraine headaches that keeps coming back.,CONSULTATION
+5981,Patient reports severe burns covering a large area of the body starting suddenly just now.,EMERGENCY
+5982,A patient has sudden severe chest pain with sweating with no relief at all.,EMERGENCY
+5983,Patient reports a small paper cut on the finger that is improving slowly.,FIRST AID
+5984,Patient reports a mild sunburn on the shoulders with no other symptoms.,FIRST AID
+5985,The patient describes severe difficulty breathing with blue lips and the person is confused.,EMERGENCY
+5986,The user says a deep wound with visible bone after an accident with no relief at all.,EMERGENCY
+5987,The person reports mild heartburn after a heavy meal that is improving slowly.,FIRST AID
+5988,Reported symptoms: persistent dry cough lasting weeks getting slightly worse over time,CONSULTATION
+5989,Reported symptoms: frequent urination with mild burning that keeps coming back,CONSULTATION
+5990,The person reports mild muscle soreness after exercise after normal daily activity.,FIRST AID
+5991,Reported symptoms: a mild sprained ankle with slight swelling after normal daily activity,FIRST AID
+5992,A patient has sudden severe chest pain with sweating and the person is getting worse.,EMERGENCY
+5993,The patient describes persistent skin rash that keeps returning that keeps coming back.,CONSULTATION
+5994,Patient reports a mild sprained ankle with slight swelling with no fever.,FIRST AID
+5995,Patient reports suspected poisoning with confusion and vomiting and the person is confused.,EMERGENCY
+5996,The user says a minor burn from hot water on the hand that started today.,FIRST AID
+5997,The person reports sudden loss of consciousness starting suddenly just now.,EMERGENCY
+5998,The user says a small paper cut on the finger with no fever.,FIRST AID
+5999,A patient has a mild sprained ankle with slight swelling that started today.,FIRST AID
+6000,A patient has a mild sunburn on the shoulders with only mild discomfort.,FIRST AID

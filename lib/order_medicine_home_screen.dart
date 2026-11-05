@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'app_text.dart';
+import 'order_medicine_home_texts.dart';
 import 'patient_prescriptions_screen.dart';
 import 'patient_orders_screen.dart';
 
@@ -9,10 +11,14 @@ import 'patient_orders_screen.dart';
 //   1. Order from a prescription
 //   2. Your orders
 //   3. Track your order
+// All its texts go through tt(), so they follow the chosen language.
 // ============================================================
 
 class OrderMedicineHomeScreen extends StatelessWidget {
   const OrderMedicineHomeScreen({super.key});
+
+  // Finds a text in the chosen language (English if it is missing)
+  String t(String text) => tt(orderHomeTexts, text);
 
   // Opens another screen (a small helper so the code is shorter)
   void openScreen(BuildContext context, Widget screen) {
@@ -112,7 +118,7 @@ class OrderMedicineHomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
-        title: const Text('Order Medicine'),
+        title: Text(t('Order Medicine')),
         backgroundColor: const Color(0xFF3F6FA8),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -136,22 +142,22 @@ class OrderMedicineHomeScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Medicines at your door',
-                          style: TextStyle(
+                          t('Medicines at your door'),
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 6),
+                        const SizedBox(height: 6),
                         Text(
-                          'Order the medicines your doctor prescribed.',
-                          style: TextStyle(
+                          t('Order the medicines your doctor prescribed.'),
+                          style: const TextStyle(
                             fontSize: 13,
                             color: Colors.white70,
                           ),
@@ -186,8 +192,8 @@ class OrderMedicineHomeScreen extends StatelessWidget {
               index: 0,
               icon: Icons.medication,
               color: Colors.teal,
-              title: 'Order from Prescription',
-              subtitle: 'Choose a prescription and order its medicines',
+              title: t('Order from Prescription'),
+              subtitle: t('Choose a prescription and order its medicines'),
               onTap: () => openScreen(
                 context,
                 const PatientPrescriptionsScreen(orderMode: true),
@@ -200,8 +206,8 @@ class OrderMedicineHomeScreen extends StatelessWidget {
               index: 1,
               icon: Icons.shopping_bag_outlined,
               color: const Color(0xFF3F6FA8),
-              title: 'Your Orders',
-              subtitle: 'See all the orders you have placed',
+              title: t('Your Orders'),
+              subtitle: t('See all the orders you have placed'),
               onTap: () => openScreen(
                 context,
                 const PatientOrdersScreen(),
@@ -214,8 +220,8 @@ class OrderMedicineHomeScreen extends StatelessWidget {
               index: 2,
               icon: Icons.local_shipping_outlined,
               color: Colors.orange,
-              title: 'Track Your Order',
-              subtitle: 'See where your medicines are right now',
+              title: t('Track Your Order'),
+              subtitle: t('See where your medicines are right now'),
               onTap: () => openScreen(
                 context,
                 const PatientOrdersScreen(trackMode: true),
@@ -232,15 +238,15 @@ class OrderMedicineHomeScreen extends StatelessWidget {
                 color: const Color(0xFFFFF4E0),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Row(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Colors.orange),
-                  SizedBox(width: 10),
+                  const Icon(Icons.info_outline, color: Colors.orange),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'A prescription can be used to order medicines for 7 days. After that, please consult the doctor again for a new prescription.',
-                      style: TextStyle(fontSize: 12),
+                      t('A prescription can be used to order medicines for 7 days. After that, please consult the doctor again for a new prescription.'),
+                      style: const TextStyle(fontSize: 12),
                     ),
                   ),
                 ],

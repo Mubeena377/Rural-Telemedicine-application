@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 class ApiService {
@@ -10,7 +11,7 @@ class ApiService {
   // (find it in the Flask terminal: "Running on http://192...").
   // ----------------------------------------------------------
   static const bool useRealPhones = false;
-  static const String computerAddress = '192.168.88.16';
+  static const String computerAddress = '192.168.88.12';
 
   static const String baseUrl = useRealPhones
       ? 'http://$computerAddress:5000'
@@ -622,6 +623,34 @@ static Future<List<Map<String, dynamic>>> getDoctorConsultations(
     throw Exception('Unable to load consultations: $e');
   }
 }
+  // ============================================================
+  // GET DOCTOR CONSULTATION QUEUE
+  // Every accepted (Scheduled) appointment of the doctor. Each one
+  // has "can_start": true once its start time has arrived.
+  // ============================================================
+  static Future<List<Map<String, dynamic>>> getDoctorConsultationQueue(
+    int doctorId,
+  ) async {
+    try {
+      // GET request to the .../consultation-queue route
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/doctors/$doctorId/consultation-queue'),
+      );
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 200 means the list was loaded successfully
+      if (response.statusCode == 200 && data['status'] == 'success') {
+        return List<Map<String, dynamic>>.from(data['consultations']);
+      }
+
+      // The server replied with an error message
+      throw Exception(data['message'] ?? 'Failed to load consultations.');
+    } catch (e) {
+      throw Exception('Unable to load consultations: $e');
+    }
+  }
 
 static Future<Map<String, dynamic>> getDoctorConsultationHistory(
   int doctorId,
@@ -1276,7 +1305,33 @@ static Future<Map<String, dynamic>> getDoctorConsultationHistory(
       print('Could not save device token: $e');
     }
   }
-  
+    // ============================================================
+  // SAVE PATIENT LANGUAGE
+  // Tells the server which language this patient chose, so the
+  // server can write notifications in that language.
+  // ============================================================
+  static Future<void> savePatientLanguage({
+    required int patientId,
+    required String language, // e.g. 'hi_IN'
+  }) async {
+    try {
+      // POST request to the .../language route we added on the server
+      await http.post(
+        Uri.parse('$baseUrl/api/patients/$patientId/language'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Convert our Dart data into JSON text for the server
+        body: jsonEncode({
+          'language': language,
+        }),
+      );
+    } catch (e) {
+      // If this fails, notifications simply stay in the old language.
+      // The app itself keeps working.
+      print('Could not save language: $e');
+    }
+  }
   // ============================================================
   // SAVE DOCTOR DEVICE TOKEN
   // Tells the server which phone belongs to this doctor, so the
@@ -1511,6 +1566,521 @@ static Future<Map<String, dynamic>> getDoctorConsultationHistory(
         'success': false,
         'message': 'Connection error: $e',
       };
+    }
+  }
+  
+  // ============================================================
+  // GET ALL NOTIFICATIONS
+  // Loads the patient's notifications (newest first) for the
+  // Alerts screen.
+  // ============================================================
+  static Future<List<Map<String, dynamic>>> getAllNotifications(
+    int patientId,
+  ) async {
+    try {
+      // GET request to the .../notifications route
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/patients/$patientId/notifications'),
+      );
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 200 means the list was loaded successfully
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(
+          data['notifications'],
+        );
+      }
+
+      // The server replied with an error message
+      throw Exception(
+        data['message'] ?? 'Failed to load notifications',
+      );
+    } catch (e) {
+      throw Exception('Connection error: $e');
+    }
+  }
+
+  // ============================================================
+  // MARK ALL NOTIFICATIONS AS READ
+  // ============================================================
+  static Future<void> markAllNotificationsRead(int patientId) async {
+    try {
+      // PUT request to the .../notifications/read-all route
+      await http.put(
+        Uri.parse(
+          '$baseUrl/api/patients/$patientId/notifications/read-all',
+        ),
+      );
+    } catch (e) {
+      // If this fails, the dots stay and nothing is lost
+      print('Could not mark notifications as read: $e');
+    }
+  }
+
+  // ============================================================
+  // GET NOTIFICATION SETTINGS
+  // Loads the four switches: appointments, reminders,
+  // prescriptions and orders (true = push notifications on).
+  // ============================================================
+  static Future<Map<String, bool>> getNotificationSettings(
+    int patientId,
+  ) async {
+    try {
+      // GET request to the .../notification-settings route
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/api/patients/$patientId/notification-settings',
+        ),
+      );
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        final settings = Map<String, dynamic>.from(data['settings']);
+
+        // Turn each value into a plain true or false
+        return settings.map((key, value) => MapEntry(key, value == true));
+      }
+
+      // The server replied with an error message
+      throw Exception(
+        data['message'] ?? 'Failed to load the settings',
+      );
+    } catch (e) {
+      throw Exception('Connection error: $e');
+    }
+  }
+
+  // ============================================================
+  // SAVE ONE NOTIFICATION SETTING
+  // Turns one kind of push notification on or off.
+  // Returns true if the server saved it.
+  // ============================================================
+  static Future<bool> saveNotificationSetting({
+    required int patientId,
+    required String category, // appointments, reminders, prescriptions, orders
+    required bool enabled,
+  }) async {
+    try {
+      // PUT request to the .../notification-settings route
+      final response = await http.put(
+        Uri.parse(
+          '$baseUrl/api/patients/$patientId/notification-settings',
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Convert our Dart data into JSON text for the server
+        body: jsonEncode({
+          category: enabled,
+        }),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  // ============================================================
+  // DOCTOR CANCELS AN APPOINTMENT
+  // The doctor cancels a Scheduled appointment. The patient is
+  // notified by the server.
+  // ============================================================
+  static Future<Map<String, dynamic>> doctorCancelAppointment({
+    required int doctorId,
+    required int appointmentId,
+  }) async {
+    try {
+      // PUT request to the .../appointments/<id>/cancel route
+      final response = await http.put(
+        Uri.parse(
+          '$baseUrl/api/doctors/$doctorId/appointments/$appointmentId/cancel',
+        ),
+      );
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 200 means the appointment was cancelled
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...data,
+        };
+      }
+
+      // Any other status means the server refused or failed
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to cancel the appointment',
+      };
+    } catch (e) {
+      // No internet, server not running, and similar problems
+      return {
+        'success': false,
+        'message': 'Connection error: $e',
+      };
+    }
+  }
+  
+  // ============================================================
+  // UPLOAD REPORT
+  // Sends a PDF or a picture (a lab result, a scan) to the server.
+  // ============================================================
+  static Future<Map<String, dynamic>> uploadReport({
+    required int patientId,
+    required String filePath, // Where the file is on the phone
+    required String reportType, // Lab, Imaging or Other
+    required String description, // A short title for the report
+  }) async {
+    try {
+      // A multipart request can carry both text and a file
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/api/patients/$patientId/reports'),
+      );
+
+      // The text fields
+      request.fields['report_type'] = reportType;
+      request.fields['description'] = description;
+
+      // The file itself
+      request.files.add(
+        await http.MultipartFile.fromPath('file', filePath),
+      );
+
+      // Send it and wait for the reply
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 201 means the report was saved
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          ...data,
+        };
+      }
+
+      // Any other status means the server refused or failed
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to upload the report',
+      };
+    } catch (e) {
+      // No internet, server not running, and similar problems
+      return {
+        'success': false,
+        'message': 'Connection error: $e',
+      };
+    }
+  }
+
+  // ============================================================
+  // GET PATIENT REPORTS
+  // Loads the list of reports a patient has uploaded.
+  // ============================================================
+  static Future<List<Map<String, dynamic>>> getPatientReports(
+    int patientId,
+  ) async {
+    try {
+      // GET request to the /api/patients/<id>/reports route
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/patients/$patientId/reports'),
+      );
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 200 means the list was loaded successfully
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(
+          data['reports'],
+        );
+      }
+
+      // The server replied with an error message
+      throw Exception(
+        data['message'] ?? 'Failed to load reports',
+      );
+    } catch (e) {
+      throw Exception('Connection error: $e');
+    }
+  }
+
+  // ============================================================
+  // GET REPORT FILE
+  // Downloads the file of one report (PDF or picture) as bytes.
+  // ============================================================
+  static Future<Uint8List> getReportFile({
+    required int patientId,
+    required int reportId,
+  }) async {
+    try {
+      // GET request to the .../reports/<id>/file route
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/api/patients/$patientId/reports/$reportId/file',
+        ),
+      );
+
+      // 200 means the file came back
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+
+      // Otherwise the server sent a JSON error message
+      final data = jsonDecode(response.body);
+
+      throw Exception(
+        data['message'] ?? 'Failed to open the report',
+      );
+    } catch (e) {
+      throw Exception('Connection error: $e');
+    }
+  }
+
+  // ============================================================
+  // DELETE REPORT
+  // Removes one uploaded report of the patient.
+  // ============================================================
+  static Future<Map<String, dynamic>> deleteReport({
+    required int patientId,
+    required int reportId,
+  }) async {
+    try {
+      // DELETE request to the .../reports/<id> route
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/patients/$patientId/reports/$reportId'),
+      );
+
+      // Convert the server's JSON reply back into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 200 means the report was deleted
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...data,
+        };
+      }
+
+      // Any other status means the server refused or failed
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to delete the report',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Connection error: $e',
+      };
+    }
+  }
+  
+  // ============================================================
+  // GET A PATIENT'S REPORTS (for a doctor)
+  // Loads the list of reports of a patient the doctor has accepted.
+  // The server refuses if the doctor has no accepted appointment.
+  // ============================================================
+  static Future<List<Map<String, dynamic>>> getPatientReportsForDoctor({
+    required int doctorId,
+    required int patientId,
+  }) async {
+    try {
+      // GET request to the .../patients/<id>/reports route
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/api/doctors/$doctorId/patients/$patientId/reports',
+        ),
+      );
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 200 means the list was loaded successfully
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(
+          data['reports'],
+        );
+      }
+
+      // The server replied with an error message
+      throw Exception(
+        data['message'] ?? 'Failed to load reports',
+      );
+    } catch (e) {
+      throw Exception('Connection error: $e');
+    }
+  }
+
+  // ============================================================
+  // GET A REPORT FILE (for a doctor)
+  // Downloads the file of one report (PDF or picture) as bytes.
+  // ============================================================
+  static Future<Uint8List> getReportFileForDoctor({
+    required int doctorId,
+    required int patientId,
+    required int reportId,
+  }) async {
+    try {
+      // GET request to the .../reports/<id>/file route
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/api/doctors/$doctorId/patients/$patientId/reports/$reportId/file',
+        ),
+      );
+
+      // 200 means the file came back
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+
+      // Otherwise the server sent a JSON error message
+      final data = jsonDecode(response.body);
+
+      throw Exception(
+        data['message'] ?? 'Failed to open the report',
+      );
+    } catch (e) {
+      throw Exception('Connection error: $e');
+    }
+  }
+  
+  // ============================================================
+  // GET FIRST AID TOPICS
+  // Loads the list of first aid topics (names and groups only).
+  // No login is needed: first aid must be quick to reach.
+  // ============================================================
+  static Future<List<Map<String, dynamic>>> getFirstAidTopics() async {
+    try {
+      // GET request to the /api/first-aid route
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/first-aid'),
+      );
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 200 means the list was loaded successfully
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(
+          data['topics'],
+        );
+      }
+
+      // The server replied with an error message
+      throw Exception(
+        data['message'] ?? 'Failed to load the first aid topics',
+      );
+    } catch (e) {
+      throw Exception('Connection error: $e');
+    }
+  }
+
+  // ============================================================
+  // GET ONE FIRST AID TOPIC
+  // Loads the full text of one topic (steps, what not to do, ...).
+  // ============================================================
+  static Future<Map<String, dynamic>> getFirstAidTopic(
+    int firstAidId,
+  ) async {
+    try {
+      // GET request to the /api/first-aid/<id> route
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/first-aid/$firstAidId'),
+      );
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 200 means the topic was loaded successfully
+      if (response.statusCode == 200) {
+        return Map<String, dynamic>.from(data['topic']);
+      }
+
+      // The server replied with an error message
+      throw Exception(
+        data['message'] ?? 'Failed to load the topic',
+      );
+    } catch (e) {
+      throw Exception('Connection error: $e');
+    }
+  }
+  
+    // ============================================================
+  // ADMIN
+  // ============================================================
+  static String? adminToken; // Kept in memory only; cleared on logout
+
+  static Future<Map<String, dynamic>> adminLogin({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/admin/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'username': username, 'password': password}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['token'] != null) {
+        adminToken = data['token'];
+        return {'success': true};
+      }
+      return {'success': false, 'message': data['message'] ?? 'Login failed'};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  // One helper for every admin call. Adds the login token automatically.
+  static Future<Map<String, dynamic>> adminRequest(
+    String method, // GET or PUT
+    String path, // Like /stats
+    {Map<String, dynamic>? body}
+  ) async {
+    try {
+      final uri = Uri.parse('$baseUrl/api/admin$path');
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${adminToken ?? ''}',
+      };
+
+      final response = method == 'PUT'
+          ? await http
+              .put(uri, headers: headers, body: jsonEncode(body ?? {}))
+              .timeout(const Duration(seconds: 15))
+          : await http
+              .get(uri, headers: headers)
+              .timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 401) {
+        adminToken = null;
+        return {
+          'success': false,
+          'expired': true,
+          'message': data['message'] ?? 'Session expired',
+        };
+      }
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return {'success': true, ...data};
+      }
+      return {'success': false, 'message': data['message'] ?? 'Request failed'};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
     }
   }
 }

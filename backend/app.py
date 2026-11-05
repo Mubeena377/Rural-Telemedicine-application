@@ -4,7 +4,9 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import psycopg2
 from werkzeug.utils import secure_filename
-from werkzeug.security import generate_password_hash
+from functools import wraps
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from werkzeug.security import generate_password_hash, check_password_hash
 import joblib
 import time
 import re
@@ -14,6 +16,8 @@ import datetime as dt
 import firebase_admin
 from firebase_admin import credentials, messaging
 from agora_token_builder import RtcTokenBuilder
+
+
 
 load_dotenv()
 print("AGORA_APP_ID exists:", "AGORA_APP_ID" in os.environ)
@@ -235,6 +239,7 @@ def check_patient_phone():
             JOIN patients p ON p.user_id = u.user_id
             WHERE u.phone = %s
               AND u.role_id = 2
+              AND u.status = 'Active'
             LIMIT 1
         """, (phone,))
 
@@ -504,6 +509,106 @@ def classify_triage(symptoms):
                 "Consult a qualified healthcare professional for further evaluation."
         }
 
+# ------------------------------------------------------------
+# FIND THE FIRST AID TOPIC THAT FITS THE SYMPTOMS
+# The words of the symptoms are compared with the words in each
+# topic's name. The topic with the most shared words wins.
+# ------------------------------------------------------------
+
+# Words that say nothing about the problem (ignored when matching)
+FIRST_AID_STOP_WORDS = {
+    "the", "and", "with", "for", "have", "has", "had", "was", "are",
+    "very", "from", "that", "this", "but", "not", "feel", "feeling",
+    "since", "after", "about", "just", "some", "much", "little",
+    "when", "then", "also", "been", "getting", "got"
+}
+
+# Everyday words that point to the word used in the topic names
+FIRST_AID_SYNONYMS = {
+    "cut": "wound", "scratch": "wound", "scrape": "wound",
+    "graze": "wound", "bleed": "bleeding", "blood": "bleeding",
+    "scald": "burn", "burnt": "burn", "burned": "burn",
+    "bitten": "bite", "stung": "sting", "twisted": "sprain",
+    "broken": "fracture"
+}
+
+
+# Turns a text into a set of simple lowercase words
+def first_aid_words(text):
+    words = set()
+
+    for word in re.findall(r"[a-z]+", (text or "").lower()):
+        # Skip very short words and the ignored words
+        if len(word) < 3 or word in FIRST_AID_STOP_WORDS:
+            continue
+
+        # "burns" and "burn" should count as the same word
+        if len(word) > 3 and word.endswith("s"):
+            word = word[:-1]
+
+        words.add(word)
+
+        # Also add the word used in the topic names, if we know it
+        if word in FIRST_AID_SYNONYMS:
+            words.add(FIRST_AID_SYNONYMS[word])
+
+    return words
+
+
+# Picks the best topic from a list of (id, name, is_priority) rows.
+# Returns None if no topic shares a word with the symptoms.
+def pick_first_aid_topic(symptoms, topics):
+    words = first_aid_words(symptoms)
+
+    if not words:
+        return None
+
+    best = None
+    best_rank = None
+
+    for topic_id, name, is_priority in topics:
+        score = len(words & first_aid_words(name))
+
+        if score == 0:
+            continue
+
+        # More shared words wins, then important topics, then the oldest
+        rank = (score, 1 if is_priority == "Y" else 0, -topic_id)
+
+        if best_rank is None or rank > best_rank:
+            best_rank = rank
+            best = {"id": topic_id, "name": name}
+
+    return best
+
+
+# Loads the topics and picks one. It uses its own database connection
+# and never raises an error, so triage keeps working even if this fails.
+def find_first_aid_topic(symptoms):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT first_aid_id, condition_name, is_priority
+            FROM first_aid_guidance
+        """)
+
+        return pick_first_aid_topic(symptoms, cursor.fetchall())
+
+    except Exception as e:
+        print("Find First Aid Topic Error:", e)
+        return None
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
 
 # ============================================================
 # TRIAGE API
@@ -561,7 +666,11 @@ def triage():
         # ----------------------------------------------------
 
         result = classify_triage(symptoms)
+        # If the result is "Basic Care", look for the first aid topic that fits
+        first_aid = None
 
+        if result["risk_code"] == "Basic Care":
+            first_aid = find_first_aid_topic(symptoms)
         # ----------------------------------------------------
         # Save triage session
         # ----------------------------------------------------
@@ -612,6 +721,8 @@ def triage():
         return jsonify({
             "status": "success",
             "triage_id": triage_id,
+            "first_aid_id": first_aid["id"] if first_aid else None,
+            "first_aid_name": first_aid["name"] if first_aid else None,            
             "risk_code": result["risk_code"],
             "risk_name": result["risk_name"],
             "recommendation": result["recommendation"]
@@ -1288,6 +1399,7 @@ def cancel_appointment(appointment_id):
 @app.route("/api/sos/<int:sos_id>/status", methods=["PATCH"])
 def update_sos_status(sos_id):
 
+
     data = request.get_json()
 
     if not data:
@@ -1392,7 +1504,8 @@ def get_doctors():
                 d.experience_years,
                 d.about,
                 d.consultation_fee,
-                d.is_available
+                d.is_available,
+                d.approval_status
             FROM doctors d
             JOIN users u
                 ON d.user_id = u.user_id
@@ -1400,6 +1513,8 @@ def get_doctors():
                 ON d.specialization_id = s.spec_id
             WHERE u.role_id = 1
               AND d.is_available = 'Y'
+              AND d.approval_status = 'Approved'
+              AND u.status = 'Active'
             ORDER BY u.full_name
         """)
 
@@ -1624,7 +1739,8 @@ def doctor_login():
                 d.qualification,
                 d.experience_years,
                 d.license_number,
-                d.is_available
+                d.is_available,
+                d.approval_status
             FROM doctors d
             JOIN users u
                 ON d.user_id = u.user_id
@@ -1645,6 +1761,17 @@ def doctor_login():
                 "status": "error",
                 "message": "No registered doctor found with this phone number"
             }), 404
+        if doctor[10] == "Pending":
+            return jsonify({
+                "status": "error",
+                "message": "Your registration is waiting for admin approval."
+            }), 403
+
+        if doctor[10] == "Rejected":
+            return jsonify({
+                "status": "error",
+                "message": "Your registration was not approved. Please contact support."
+            }), 403
 
         return jsonify({
             "status": "success",
@@ -1925,6 +2052,82 @@ def get_doctor_consultations(doctor_id):
             "message": str(e)
         }), 500
 
+# ============================================================
+# DOCTOR'S CONSULTATION QUEUE
+# Every ACCEPTED (Scheduled) appointment of this doctor, even if
+# its time has not come yet. "can_start" is true once the
+# appointment time has arrived, so the app can switch on the
+# Start button only then.
+# Completed appointments are not here: they live in the
+# consultation history.
+# ============================================================
+@app.route('/api/doctors/<int:doctor_id>/consultation-queue', methods=['GET'])
+def get_doctor_consultation_queue(doctor_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                a.appointment_id,
+                a.patient_id,
+                u.full_name AS patient_name,
+                a.appointment_date,
+                a.start_time,
+                a.end_time,
+                a.consultation_mode,
+                a.reason_for_visit,
+                a.status,
+                (a.appointment_date + a.start_time)
+                    <= CURRENT_TIMESTAMP::timestamp AS can_start
+            FROM appointments a
+            JOIN patients p
+                ON a.patient_id = p.patient_id
+            JOIN users u
+                ON p.user_id = u.user_id
+            WHERE a.doctor_id = %s
+              AND a.status = 'Scheduled'
+            ORDER BY a.appointment_date ASC, a.start_time ASC
+        """, (doctor_id,))
+
+        consultations = []
+
+        for row in cursor.fetchall():
+            consultations.append({
+                "appointment_id": row[0],
+                "patient_id": row[1],
+                "patient_name": row[2],
+                "appointment_date": str(row[3]),
+                "start_time": str(row[4]),
+                "end_time": str(row[5]),
+                "consultation_mode": row[6],
+                "reason_for_visit": row[7],
+                "status": row[8],
+                "can_start": bool(row[9])
+            })
+
+        return jsonify({
+            "status": "success",
+            "consultations": consultations
+        }), 200
+
+    except Exception as e:
+        print("Consultation Queue Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load consultations"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
 
 @app.route('/api/doctors/<int:doctor_id>/consultation-history', methods=['GET'])
 def get_doctor_consultation_history(doctor_id):
@@ -2098,32 +2301,49 @@ def generate_video_token(appointment_id):
                     """, (patient_user_id, appointment_id))
 
                     if not cursor.fetchone():
+                          # Find out which language the patient chose
+                        cursor.execute(
+                            "SELECT language FROM users WHERE user_id = %s",
+                            (patient_user_id,)
+                        )
+                        language_row = cursor.fetchone()
+                        patient_language = (
+                            language_row[0] if language_row else "en_IN"
+                        )
+
+                        # Get the title and texts in that language
+                        # (English is used if the language is missing)
+                        title, message, push_text = notif_text(
+                            "ConsultationStarted",
+                            patient_language,
+                            doctor_name=doctor_name
+                        )
+
+                        # Save the notification in the patient's list
                         cursor.execute("""
                             INSERT INTO notifications
                                 (user_id, title, message, type, appointment_id)
                             VALUES (%s, %s, %s, 'ConsultationStarted', %s)
                         """, (
                             patient_user_id,
-                            "Your doctor is ready",
-                            f"{doctor_name} has started your consultation. "
-                            "Tap Join to start the video call.",
+                            title,
+                            message,
                             appointment_id
                         ))
 
                         conn.commit()
 
                         # Also send a real push notification to the
-                        # patient's phone(s)
+                        # patient's phone(s), in the same language
                         send_push_to_user(
                             patient_user_id,
-                            "Your doctor is ready",
-                            f"{doctor_name} has started your consultation. Tap to join.",
+                            title,
+                            push_text,
                             {
                                 "type": "ConsultationStarted",
                                 "appointment_id": str(appointment_id)
                             }
-                        )
-
+                        )                      
             except Exception as notice_error:
                 # Forget the failed notice and carry on with the call
                 conn.rollback()
@@ -2345,10 +2565,62 @@ def save_prescription():
 
         conn.commit()
 
+        # ----- Tell the patient. A problem here must never undo the
+        # saved prescription, so it has its own try/except. -----
+        try:
+            cursor.execute("""
+                SELECT p.user_id, du.full_name
+                FROM consultations c
+                JOIN appointments a
+                    ON c.appointment_id = a.appointment_id
+                JOIN patients p
+                    ON a.patient_id = p.patient_id
+                JOIN doctors d
+                    ON a.doctor_id = d.doctor_id
+                JOIN users du
+                    ON d.user_id = du.user_id
+                WHERE c.consultation_id = %s
+            """, (consultation_id,))
+
+            info = cursor.fetchone()
+
+            if info:
+                patient_user_id = info[0]
+                doctor_name = info[1]
+
+                title = "New prescription"
+                message = (
+                    f"{doctor_name} has issued your prescription. "
+                    "You can order the medicines within 7 days."
+                )
+
+                # Save the notice (for the Alerts list)
+                cursor.execute("""
+                    INSERT INTO notifications
+                        (user_id, title, message, type)
+                    VALUES (%s, %s, %s, 'PrescriptionIssued')
+                """, (patient_user_id, title, message))
+
+                conn.commit()
+
+                # Send the push notification to the patient's phone(s)
+                send_push_to_user(
+                    patient_user_id,
+                    title,
+                    message,
+                    {
+                        "type": "PrescriptionIssued",
+                        "prescription_id": str(prescription_id)
+                    }
+                )
+
+        except Exception as notice_error:
+            conn.rollback()
+            print("Prescription notice error:", notice_error)
+
         return jsonify({
             "status": "success",
             "message": "Prescription saved successfully",
-            "prescription_id": prescription_id
         }), 201
 
     except Exception as e:
@@ -3246,7 +3518,7 @@ def get_doctor_patients(doctor_id):
             JOIN users u
                 ON pt.user_id = u.user_id
             WHERE a.doctor_id = %s
-              AND a.status <> 'Cancelled'
+              AND a.status IN ('Scheduled', 'Completed', 'Rescheduled')
             GROUP BY
                 pt.patient_id,
                 u.full_name,
@@ -3311,7 +3583,7 @@ def get_patient_record_for_doctor(doctor_id, patient_id):
             FROM appointments
             WHERE doctor_id = %s
               AND patient_id = %s
-              AND status <> 'Cancelled'
+              AND status IN ('Scheduled', 'Completed', 'Rescheduled')
             LIMIT 1
         """, (doctor_id, patient_id))
 
@@ -3952,6 +4224,263 @@ def save_patient_device_token(patient_id):
             conn.close()
 
 # ============================================================
+# NOTIFICATION TEXTS
+# Every notification the server sends, written in the 8 app
+# languages. {doctor_name} and similar blanks are filled in
+# when the notification is sent.
+# If a language or a kind is missing, English is used instead.
+# Each kind has: a title, the message saved in the app's list,
+# and a shorter message for the push on the lock screen.
+# ============================================================
+
+NOTIFICATION_TEXTS = {
+     # ---- Doctor accepts an appointment request ----
+    "AppointmentAccepted": {
+        "en_IN": {
+            "title": "Appointment accepted",
+            "message": "{doctor_name} accepted your appointment on {date} at {time}.",
+            "push": "{doctor_name} accepted your appointment on {date} at {time}.",
+        },
+        "hi_IN": {
+            "title": "अपॉइंटमेंट स्वीकार किया गया",
+            "message": "{doctor_name} ने {date} को {time} बजे आपकी अपॉइंटमेंट स्वीकार कर ली है।",
+            "push": "{doctor_name} ने {date} को {time} बजे आपकी अपॉइंटमेंट स्वीकार कर ली है।",
+        },
+        "kn_IN": {
+            "title": "ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಸ್ವೀಕರಿಸಲಾಗಿದೆ",
+            "message": "{doctor_name} ಅವರು {date} ರಂದು {time} ಕ್ಕೆ ನಿಮ್ಮ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಅನ್ನು ಸ್ವೀಕರಿಸಿದ್ದಾರೆ.",
+            "push": "{doctor_name} ಅವರು {date} ರಂದು {time} ಕ್ಕೆ ನಿಮ್ಮ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಅನ್ನು ಸ್ವೀಕರಿಸಿದ್ದಾರೆ.",
+        },
+        "ta_IN": {
+            "title": "சந்திப்பு ஏற்கப்பட்டது",
+            "message": "{doctor_name} {date} அன்று {time} மணிக்கு உங்கள் சந்திப்பை ஏற்றுக்கொண்டார்.",
+            "push": "{doctor_name} {date} அன்று {time} மணிக்கு உங்கள் சந்திப்பை ஏற்றுக்கொண்டார்.",
+        },
+        "te_IN": {
+            "title": "అపాయింట్‌మెంట్ అంగీకరించబడింది",
+            "message": "{doctor_name} {date} న {time} కి మీ అపాయింట్‌మెంట్‌ను అంగీకరించారు.",
+            "push": "{doctor_name} {date} న {time} కి మీ అపాయింట్‌మెంట్‌ను అంగీకరించారు.",
+        },
+        "ml_IN": {
+            "title": "അപ്പോയിന്റ്മെന്റ് സ്വീകരിച്ചു",
+            "message": "{doctor_name} {date} ന് {time} ന് നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് സ്വീകരിച്ചു.",
+            "push": "{doctor_name} {date} ന് {time} ന് നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് സ്വീകരിച്ചു.",
+        },
+        "mr_IN": {
+            "title": "अपॉइंटमेंट स्वीकारली",
+            "message": "{doctor_name} यांनी {date} रोजी {time} वाजता तुमची अपॉइंटमेंट स्वीकारली आहे.",
+            "push": "{doctor_name} यांनी {date} रोजी {time} वाजता तुमची अपॉइंटमेंट स्वीकारली आहे.",
+        },
+        "bn_IN": {
+            "title": "অ্যাপয়েন্টমেন্ট গৃহীত হয়েছে",
+            "message": "{doctor_name} {date} তারিখে {time} টায় আপনার অ্যাপয়েন্টমেন্ট গ্রহণ করেছেন।",
+            "push": "{doctor_name} {date} তারিখে {time} টায় আপনার অ্যাপয়েন্টমেন্ট গ্রহণ করেছেন।",
+        },
+    },
+
+    # ---- Doctor cannot accept an appointment request ----
+    "AppointmentRejected": {
+        "en_IN": {
+            "title": "Appointment not accepted",
+            "message": "{doctor_name} could not accept your appointment on {date} at {time}. Please book another time.",
+            "push": "{doctor_name} could not accept your appointment on {date} at {time}. Please book another time.",
+        },
+        "hi_IN": {
+            "title": "अपॉइंटमेंट स्वीकार नहीं हुआ",
+            "message": "{doctor_name} {date} को {time} बजे आपकी अपॉइंटमेंट स्वीकार नहीं कर सके। कृपया कोई और समय बुक करें।",
+            "push": "{doctor_name} {date} को {time} बजे आपकी अपॉइंटमेंट स्वीकार नहीं कर सके। कृपया कोई और समय बुक करें।",
+        },
+        "kn_IN": {
+            "title": "ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಸ್ವೀಕರಿಸಲಾಗಿಲ್ಲ",
+            "message": "{doctor_name} ಅವರು {date} ರಂದು {time} ಕ್ಕೆ ನಿಮ್ಮ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಅನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೇರೆ ಸಮಯ ಬುಕ್ ಮಾಡಿ.",
+            "push": "{doctor_name} ಅವರು {date} ರಂದು {time} ಕ್ಕೆ ನಿಮ್ಮ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಅನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಬೇರೆ ಸಮಯ ಬುಕ್ ಮಾಡಿ.",
+        },
+        "ta_IN": {
+            "title": "சந்திப்பு ஏற்கப்படவில்லை",
+            "message": "{doctor_name} {date} அன்று {time} மணிக்கு உங்கள் சந்திப்பை ஏற்க முடியவில்லை. தயவுசெய்து வேறு நேரத்தை முன்பதிவு செய்யவும்.",
+            "push": "{doctor_name} {date} அன்று {time} மணிக்கு உங்கள் சந்திப்பை ஏற்க முடியவில்லை. தயவுசெய்து வேறு நேரத்தை முன்பதிவு செய்யவும்.",
+        },
+        "te_IN": {
+            "title": "అపాయింట్‌మెంట్ అంగీకరించబడలేదు",
+            "message": "{doctor_name} {date} న {time} కి మీ అపాయింట్‌మెంట్‌ను అంగీకరించలేకపోయారు. దయచేసి మరో సమయాన్ని బుక్ చేయండి.",
+            "push": "{doctor_name} {date} న {time} కి మీ అపాయింట్‌మెంట్‌ను అంగీకరించలేకపోయారు. దయచేసి మరో సమయాన్ని బుక్ చేయండి.",
+        },
+        "ml_IN": {
+            "title": "അപ്പോയിന്റ്മെന്റ് സ്വീകരിച്ചില്ല",
+            "message": "{doctor_name} {date} ന് {time} ന് നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് സ്വീകരിക്കാൻ കഴിഞ്ഞില്ല. ദയവായി മറ്റൊരു സമയം ബുക്ക് ചെയ്യുക.",
+            "push": "{doctor_name} {date} ന് {time} ന് നിങ്ങളുടെ അപ്പോയിന്റ്മെന്റ് സ്വീകരിക്കാൻ കഴിഞ്ഞില്ല. ദയവായി മറ്റൊരു സമയം ബുക്ക് ചെയ്യുക.",
+        },
+        "mr_IN": {
+            "title": "अपॉइंटमेंट स्वीकारली नाही",
+            "message": "{doctor_name} यांना {date} रोजी {time} वाजता तुमची अपॉइंटमेंट स्वीकारता आली नाही. कृपया दुसरी वेळ बुक करा.",
+            "push": "{doctor_name} यांना {date} रोजी {time} वाजता तुमची अपॉइंटमेंट स्वीकारता आली नाही. कृपया दुसरी वेळ बुक करा.",
+        },
+        "bn_IN": {
+            "title": "অ্যাপয়েন্টমেন্ট গৃহীত হয়নি",
+            "message": "{doctor_name} {date} তারিখে {time} টায় আপনার অ্যাপয়েন্টমেন্ট গ্রহণ করতে পারেননি। অনুগ্রহ করে অন্য সময় বুক করুন।",
+            "push": "{doctor_name} {date} তারিখে {time} টায় আপনার অ্যাপয়েন্টমেন্ট গ্রহণ করতে পারেননি। অনুগ্রহ করে অন্য সময় বুক করুন।",
+        },
+    },  
+    "ConsultationStarted": {
+        "en_IN": {
+            "title": "Your doctor is ready",
+            "message": "{doctor_name} has started your consultation. Tap Join to start the video call.",
+            "push": "{doctor_name} has started your consultation. Tap to join.",
+        },
+        "hi_IN": {
+            "title": "आपके डॉक्टर तैयार हैं",
+            "message": "{doctor_name} ने आपका परामर्श शुरू कर दिया है। वीडियो कॉल शुरू करने के लिए जॉइन पर टैप करें।",
+            "push": "{doctor_name} ने आपका परामर्श शुरू कर दिया है। जॉइन करने के लिए टैप करें।",
+        },
+        "kn_IN": {
+            "title": "ನಿಮ್ಮ ವೈದ್ಯರು ಸಿದ್ಧರಾಗಿದ್ದಾರೆ",
+            "message": "{doctor_name} ಅವರು ನಿಮ್ಮ ಸಮಾಲೋಚನೆಯನ್ನು ಪ್ರಾರಂಭಿಸಿದ್ದಾರೆ. ವೀಡಿಯೊ ಕರೆ ಪ್ರಾರಂಭಿಸಲು ಜಾಯಿನ್ ಒತ್ತಿರಿ.",
+            "push": "{doctor_name} ಅವರು ನಿಮ್ಮ ಸಮಾಲೋಚನೆಯನ್ನು ಪ್ರಾರಂಭಿಸಿದ್ದಾರೆ. ಸೇರಲು ಟ್ಯಾಪ್ ಮಾಡಿ.",
+        },
+        "ta_IN": {
+            "title": "உங்கள் மருத்துவர் தயார்",
+            "message": "{doctor_name} உங்கள் ஆலோசனையைத் தொடங்கிவிட்டார். வீடியோ அழைப்பைத் தொடங்க இணை என்பதைத் தட்டவும்.",
+            "push": "{doctor_name} உங்கள் ஆலோசனையைத் தொடங்கிவிட்டார். சேர தட்டவும்.",
+        },
+        "te_IN": {
+            "title": "మీ డాక్టర్ సిద్ధంగా ఉన్నారు",
+            "message": "{doctor_name} మీ సంప్రదింపును ప్రారంభించారు. వీడియో కాల్ ప్రారంభించడానికి జాయిన్ నొక్కండి.",
+            "push": "{doctor_name} మీ సంప్రదింపును ప్రారంభించారు. చేరడానికి నొక్కండి.",
+        },
+        "ml_IN": {
+            "title": "നിങ്ങളുടെ ഡോക്ടർ തയ്യാറാണ്",
+            "message": "{doctor_name} നിങ്ങളുടെ കൺസൾട്ടേഷൻ ആരംഭിച്ചു. വീഡിയോ കോൾ തുടങ്ങാൻ ജോയിൻ ടാപ്പ് ചെയ്യുക.",
+            "push": "{doctor_name} നിങ്ങളുടെ കൺസൾട്ടേഷൻ ആരംഭിച്ചു. ചേരാൻ ടാപ്പ് ചെയ്യുക.",
+        },
+        "mr_IN": {
+            "title": "तुमचे डॉक्टर तयार आहेत",
+            "message": "{doctor_name} यांनी तुमचा सल्ला सुरू केला आहे. व्हिडिओ कॉल सुरू करण्यासाठी जॉइन वर टॅप करा.",
+            "push": "{doctor_name} यांनी तुमचा सल्ला सुरू केला आहे. जॉइन करण्यासाठी टॅप करा.",
+        },
+        "bn_IN": {
+            "title": "আপনার ডাক্তার প্রস্তুত",
+            "message": "{doctor_name} আপনার পরামর্শ শুরু করেছেন। ভিডিও কল শুরু করতে জয়েন-এ ট্যাপ করুন।",
+            "push": "{doctor_name} আপনার পরামর্শ শুরু করেছেন। যোগ দিতে ট্যাপ করুন।",
+        },
+    },
+}
+
+
+def notif_text(kind, language, **values):
+    # Returns (title, message, push) for one notification kind.
+    #   kind     - the notification type, for example "ConsultationStarted"
+    #   language - the user's language code, for example "ta_IN"
+    #   values   - the blanks to fill in, for example doctor_name="Dr. Rao"
+
+    # All the languages for this kind (empty if the kind is unknown)
+    versions = NOTIFICATION_TEXTS.get(kind, {})
+
+    # Use the user's language, or English if it is missing
+    chosen = versions.get(language) or versions.get("en_IN")
+
+    # An unknown kind: return empty texts instead of crashing
+    if not chosen:
+        return "", "", ""
+
+    try:
+        # Fill the blanks such as {doctor_name}
+        return (
+            chosen["title"].format(**values),
+            chosen["message"].format(**values),
+            chosen["push"].format(**values),
+        )
+    except (KeyError, IndexError):
+        # A blank was not provided: return the text as it is
+        return chosen["title"], chosen["message"], chosen["push"]
+
+# ============================================================
+# SAVE THE LANGUAGE A PATIENT CHOSE
+# The app calls this whenever the patient picks a language.
+# The server uses it to write notifications in that language.
+# ============================================================
+
+# The 8 languages the app supports (anything else is rejected)
+SUPPORTED_LANGUAGES = (
+    "en_IN", "hi_IN", "kn_IN", "ta_IN",
+    "te_IN", "ml_IN", "mr_IN", "bn_IN",
+)
+
+@app.route("/api/patients/<int:patient_id>/language", methods=["POST"])
+def save_patient_language(patient_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "status": "error",
+            "message": "No data received"
+        }), 400
+
+    language = (data.get("language") or "").strip()
+
+    # Only accept one of our 8 language codes
+    if language not in SUPPORTED_LANGUAGES:
+        return jsonify({
+            "status": "error",
+            "message": "Unsupported language"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Find the user that belongs to this patient
+        cursor.execute(
+            "SELECT user_id FROM patients WHERE patient_id = %s",
+            (patient_id,)
+        )
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Patient not found"
+            }), 404
+
+        user_id = row[0]
+
+        # Save the language on that user ("Users" needs double quotes
+        # because the table name starts with a capital letter)
+        cursor.execute(
+            # The table is called users (no quotes, same as the login code)
+            'UPDATE users SET language = %s WHERE user_id = %s',
+            (language, user_id)
+        )
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Language saved"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Save Language Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save the language"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
 # SEND A PUSH NOTIFICATION TO ONE USER
 # Sends the message to every phone saved for that user.
 # It never raises an error, so a notification problem can
@@ -3962,6 +4491,15 @@ def send_push_to_user(user_id, title, body, data=None):
     # Firebase must have started correctly (see the top of this file)
     if not firebase_ready:
         print("Push skipped: Firebase is not ready")
+        return
+
+    # Respect the person's notification settings (the Alerts screen).
+    # A muted kind of notification is still saved in their list,
+    # it just does not arrive as a push.
+    category = NOTIFICATION_CATEGORY.get((data or {}).get("type"))
+
+    if category and not push_is_enabled(user_id, category):
+        print("Push skipped: user", user_id, "muted", category)
         return
 
     conn = None
@@ -4423,6 +4961,197 @@ def send_due_reminders():
             conn.close()
 
 
+# Follow-up reminders are sent from this hour of the day on
+# (9 means 9:00 AM)
+FOLLOWUP_FROM_HOUR = 9
+
+
+# Tells each patient whose follow-up date is TOMORROW. Every patient
+# gets it once, because the notifications table remembers it.
+def send_followup_reminders():
+    # Too early in the day: wait until the set hour
+    if dt.datetime.now().hour < FOLLOWUP_FROM_HOUR:
+        return
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                c.appointment_id,
+                c.follow_up_date,
+                pu.user_id,
+                du.full_name
+            FROM consultations c
+            JOIN appointments a
+                ON c.appointment_id = a.appointment_id
+            JOIN patients p
+                ON a.patient_id = p.patient_id
+            JOIN users pu
+                ON p.user_id = pu.user_id
+            JOIN doctors d
+                ON a.doctor_id = d.doctor_id
+            JOIN users du
+                ON d.user_id = du.user_id
+            WHERE c.follow_up_date = CURRENT_DATE + 1
+        """)
+
+        for row in cursor.fetchall():
+            appointment_id, follow_date, user_id, doctor_name = row
+
+            # Skip if this patient was already reminded about it
+            cursor.execute("""
+                SELECT 1
+                FROM notifications
+                WHERE user_id = %s
+                  AND appointment_id = %s
+                  AND type = 'FollowUpReminder'
+                LIMIT 1
+            """, (user_id, appointment_id))
+
+            if cursor.fetchone():
+                continue
+
+            title = "Follow-up due tomorrow"
+            message = (
+                f"Your follow-up with {doctor_name} is due tomorrow "
+                f"({follow_date}). Please book an appointment."
+            )
+
+            # Save the notice first, so it can never be sent twice
+            cursor.execute("""
+                INSERT INTO notifications
+                    (user_id, title, message, type, appointment_id)
+                VALUES (%s, %s, %s, 'FollowUpReminder', %s)
+            """, (user_id, title, message, appointment_id))
+
+            conn.commit()
+
+            # Then send the push notification
+            send_push_to_user(
+                user_id,
+                title,
+                message,
+                {
+                    "type": "FollowUpReminder",
+                    "appointment_id": str(appointment_id)
+                }
+            )
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Follow-up reminder error:", e)
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ------------------------------------------------------------
+# "TIME TO START" ALERT FOR THE DOCTOR
+# Checked every minute. When an accepted appointment's start time
+# has just arrived, the doctor gets one push notification.
+# It is only sent within a few minutes after the start time, so
+# old appointments do not trigger alerts after the server restarts.
+# ------------------------------------------------------------
+START_ALERT_WINDOW_MINUTES = 5
+
+
+def send_start_time_alerts():
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Accepted appointments that started within the last few minutes
+        cursor.execute("""
+            SELECT
+                a.appointment_id,
+                a.start_time,
+                pu.full_name,
+                du.user_id
+            FROM appointments a
+            JOIN patients p
+                ON a.patient_id = p.patient_id
+            JOIN users pu
+                ON p.user_id = pu.user_id
+            JOIN doctors d
+                ON a.doctor_id = d.doctor_id
+            JOIN users du
+                ON d.user_id = du.user_id
+            WHERE a.status = 'Scheduled'
+              AND (a.appointment_date + a.start_time) <= CURRENT_TIMESTAMP
+              AND (a.appointment_date + a.start_time)
+                    > CURRENT_TIMESTAMP - (%s * INTERVAL '1 minute')
+        """, (START_ALERT_WINDOW_MINUTES,))
+        # TEMPORARY: shows in the terminal every minute that this check runs
+        print("Start-time check ran. Matching appointments:", cursor.rowcount)
+        for row in cursor.fetchall():
+            appointment_id, start_time, patient_name, doctor_user_id = row
+
+            title = "Time to start the consultation"
+            message = (
+                f"It is time for your consultation with {patient_name} "
+                f"({str(start_time)[:5]}). Open Consultations to start."
+            )
+
+            # Skip if the doctor already got this alert for this appointment
+            cursor.execute("""
+                SELECT 1
+                FROM notifications
+                WHERE user_id = %s
+                  AND appointment_id = %s
+                  AND type = 'AppointmentReminder'
+                  AND title = %s
+                LIMIT 1
+            """, (doctor_user_id, appointment_id, title))
+
+            if cursor.fetchone():
+                continue
+
+            # Save the notice first, so it can never be sent twice
+            cursor.execute("""
+                INSERT INTO notifications
+                    (user_id, title, message, type, appointment_id)
+                VALUES (%s, %s, %s, 'AppointmentReminder', %s)
+            """, (doctor_user_id, title, message, appointment_id))
+
+            conn.commit()
+
+            # Then send the push notification to the doctor's phone(s)
+            send_push_to_user(
+                doctor_user_id,
+                title,
+                message,
+                {
+                    "type": "AppointmentReminder",
+                    "appointment_id": str(appointment_id)
+                }
+            )
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Start time alert error:", e)
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
 # Runs forever in the background: check, sleep one minute, repeat
 def reminder_loop():
     while True:
@@ -4430,6 +5159,16 @@ def reminder_loop():
             send_due_reminders()
         except Exception as e:
             print("Reminder loop error:", e)
+
+        try:
+            send_followup_reminders()
+        except Exception as e:
+            print("Follow-up loop error:", e)
+
+        try:
+            send_start_time_alerts()
+        except Exception as e:
+            print("Start time alert error:", e)
 
         time.sleep(60)
 
@@ -4824,9 +5563,1861 @@ def get_free_slots(doctor_id):
         if conn:
             conn.close()
 
-if __name__ == "__main__":
+# ============================================================
+# CHANGE THE STATUS OF A MEDICINE ORDER
+# Used by the pharmacy or admin (a screen for it comes later).
+# It needs the secret ADMIN_KEY from the .env file in the
+# "X-Admin-Key" header. The patient gets a notice and a push.
+# ============================================================
 
-        app.run(
+ORDER_STATUS_MESSAGES = {
+    "Confirmed": "has been confirmed by the pharmacy.",
+    "Dispatched": "is on its way to you.",
+    "Delivered": "has been delivered. Take the medicines as prescribed.",
+    "Cancelled": "was cancelled.",
+}
+
+
+@app.route("/api/medicine-orders/<int:order_id>/status", methods=["PUT"])
+def update_order_status(order_id):
+    # --- Only someone who knows the secret key may use this route ---
+    admin_key = os.getenv("ADMIN_KEY")
+
+    if not admin_key:
+        return jsonify({
+            "status": "error",
+            "message": "ADMIN_KEY is not set on the server"
+        }), 503
+
+    if request.headers.get("X-Admin-Key") != admin_key:
+        return jsonify({
+            "status": "error",
+            "message": "Not allowed"
+        }), 403
+
+    data = request.get_json(silent=True) or {}
+    new_status = data.get("status")
+
+    if new_status not in ORDER_STATUS_MESSAGES:
+        return jsonify({
+            "status": "error",
+            "message": "Status must be Confirmed, Dispatched, Delivered or Cancelled"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The order must exist, and must not be finished already
+        cursor.execute("""
+            SELECT o.status, p.user_id
+            FROM medicine_orders o
+            JOIN patients p
+                ON o.patient_id = p.patient_id
+            WHERE o.order_id = %s
+        """, (order_id,))
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Order not found"
+            }), 404
+
+        current_status, patient_user_id = row
+
+        if current_status in ("Delivered", "Cancelled"):
+            return jsonify({
+                "status": "error",
+                "message": f"This order is already {current_status}"
+            }), 400
+
+        cursor.execute("""
+            UPDATE medicine_orders
+            SET status = %s
+            WHERE order_id = %s
+        """, (new_status, order_id))
+
+        conn.commit()
+
+        # ----- Tell the patient. A problem here must never undo the
+        # status change, so it has its own try/except. -----
+        try:
+            title = f"Order {new_status}"
+            message = f"Your order #{order_id} {ORDER_STATUS_MESSAGES[new_status]}"
+
+            # Save the notice (for the Alerts list)
+            cursor.execute("""
+                INSERT INTO notifications
+                    (user_id, title, message, type)
+                VALUES (%s, %s, %s, 'OrderStatus')
+            """, (patient_user_id, title, message))
+
+            conn.commit()
+
+            # Send the push notification to the patient's phone(s)
+            send_push_to_user(
+                patient_user_id,
+                title,
+                message,
+                {
+                    "type": "OrderStatus",
+                    "order_id": str(order_id)
+                }
+            )
+
+        except Exception as notice_error:
+            conn.rollback()
+            print("Order notice error:", notice_error)
+
+        return jsonify({
+            "status": "success",
+            "message": "Order status updated",
+            "new_status": new_status
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Update Order Status Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to update the order"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# NOTIFICATION LIST AND SETTINGS (the Alerts screen)
+# ============================================================
+
+# Which kind of setting each notification belongs to
+NOTIFICATION_CATEGORY = {
+    "AppointmentRequest": "appointments",
+    "AppointmentAccepted": "appointments",
+    "AppointmentRejected": "appointments",
+    "AppointmentCancelled": "appointments",
+    "ConsultationStarted": "appointments",
+    "AppointmentReminder": "reminders",
+    "FollowUpReminder": "reminders",
+    "PrescriptionIssued": "prescriptions",
+    "OrderStatus": "orders",
+}
+
+# The four switches shown on the Alerts screen
+ALL_CATEGORIES = ["appointments", "reminders", "prescriptions", "orders"]
+
+
+# True if the person has not muted this kind of notification
+def push_is_enabled(user_id, category):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT enabled
+            FROM notification_preferences
+            WHERE user_id = %s
+              AND category = %s
+        """, (user_id, category))
+
+        row = cursor.fetchone()
+
+        # No row means nothing was ever changed: everything is on
+        return True if not row else row[0] == 'Y'
+
+    except Exception as e:
+        # If the settings cannot be read, send the push anyway
+        print("Notification settings error:", e)
+        return True
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- The patient's notifications, newest first -----
+@app.route("/api/patients/<int:patient_id>/notifications", methods=["GET"])
+def get_patient_notifications(patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                n.notification_id,
+                n.title,
+                n.message,
+                n.type,
+                n.appointment_id,
+                n.is_read,
+                n.created_at
+            FROM notifications n
+            JOIN patients p
+                ON n.user_id = p.user_id
+            WHERE p.patient_id = %s
+            ORDER BY n.created_at DESC, n.notification_id DESC
+            LIMIT 50
+        """, (patient_id,))
+
+        notifications = []
+
+        for row in cursor.fetchall():
+            notifications.append({
+                "notification_id": row[0],
+                "title": row[1],
+                "message": row[2],
+                "type": row[3],
+                "appointment_id": row[4],
+                "is_read": row[5] == 'Y',
+                # For example "2026-10-26 17:22"
+                "created_at": str(row[6])[:16]
+            })
+
+        return jsonify({
+            "status": "success",
+            "notifications": notifications
+        }), 200
+
+    except Exception as e:
+        print("Get Notifications List Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load notifications"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- Mark all of the patient's notifications as read -----
+@app.route("/api/patients/<int:patient_id>/notifications/read-all", methods=["PUT"])
+def mark_all_notifications_read(patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE notifications
+            SET is_read = 'Y'
+            WHERE is_read = 'N'
+              AND user_id = (
+                  SELECT user_id FROM patients WHERE patient_id = %s
+              )
+        """, (patient_id,))
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "All marked as read"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Mark All Read Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to update the notifications"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- Read the patient's four switches -----
+@app.route("/api/patients/<int:patient_id>/notification-settings", methods=["GET"])
+def get_notification_settings(patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT np.category, np.enabled
+            FROM notification_preferences np
+            JOIN patients p
+                ON np.user_id = p.user_id
+            WHERE p.patient_id = %s
+        """, (patient_id,))
+
+        saved = {row[0]: row[1] == 'Y' for row in cursor.fetchall()}
+
+        # Anything not saved yet is on
+        settings = {c: saved.get(c, True) for c in ALL_CATEGORIES}
+
+        return jsonify({
+            "status": "success",
+            "settings": settings
+        }), 200
+
+    except Exception as e:
+        print("Get Notification Settings Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the settings"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- Save one or more of the patient's switches -----
+@app.route("/api/patients/<int:patient_id>/notification-settings", methods=["PUT"])
+def save_notification_settings(patient_id):
+    data = request.get_json(silent=True) or {}
+
+    # Only the four known switches are accepted
+    changes = {
+        key: value for key, value in data.items()
+        if key in ALL_CATEGORIES and isinstance(value, bool)
+    }
+
+    if not changes:
+        return jsonify({
+            "status": "error",
+            "message": "No valid settings received"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT user_id FROM patients WHERE patient_id = %s",
+            (patient_id,)
+        )
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Patient not found"
+            }), 404
+
+        user_id = row[0]
+
+        for category, enabled in changes.items():
+            cursor.execute("""
+                INSERT INTO notification_preferences
+                    (user_id, category, enabled)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_id, category)
+                DO UPDATE SET
+                    enabled = EXCLUDED.enabled,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (user_id, category, 'Y' if enabled else 'N'))
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Settings saved"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Save Notification Settings Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save the settings"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# DOCTOR CANCELS A SCHEDULED APPOINTMENT
+# Only the doctor's own Scheduled appointments can be cancelled.
+# The patient gets a notice and a push notification.
+# ============================================================
+
+@app.route(
+    "/api/doctors/<int:doctor_id>/appointments/<int:appointment_id>/cancel",
+    methods=["PUT"]
+)
+def doctor_cancel_appointment(doctor_id, appointment_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Change the status, but only for this doctor's Scheduled appointment
+        cursor.execute("""
+            UPDATE appointments
+            SET status = 'Cancelled'
+            WHERE appointment_id = %s
+              AND doctor_id = %s
+              AND status = 'Scheduled'
+            RETURNING appointment_id
+        """, (appointment_id, doctor_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "Appointment not found or cannot be cancelled"
+            }), 404
+
+        conn.commit()
+
+        # ----- Tell the patient. A problem here must never undo the
+        # cancellation, so it has its own try/except. -----
+        try:
+            cursor.execute("""
+                SELECT p.user_id, du.full_name,
+                       a.appointment_date, a.start_time
+                FROM appointments a
+                JOIN patients p
+                    ON a.patient_id = p.patient_id
+                JOIN doctors d
+                    ON a.doctor_id = d.doctor_id
+                JOIN users du
+                    ON d.user_id = du.user_id
+                WHERE a.appointment_id = %s
+            """, (appointment_id,))
+
+            info = cursor.fetchone()
+
+            if info:
+                patient_user_id = info[0]
+                doctor_name = info[1]
+                when = f"{info[2]} at {str(info[3])[:5]}"
+
+                title = "Appointment cancelled by the doctor"
+                message = (
+                    f"{doctor_name} cancelled your appointment on {when}. "
+                    "Please book another time."
+                )
+
+                # Save the notice (for the Alerts list)
+                cursor.execute("""
+                    INSERT INTO notifications
+                        (user_id, title, message, type, appointment_id)
+                    VALUES (%s, %s, %s, 'AppointmentCancelled', %s)
+                """, (patient_user_id, title, message, appointment_id))
+
+                conn.commit()
+
+                # Send the push notification to the patient's phone(s)
+                send_push_to_user(
+                    patient_user_id,
+                    title,
+                    message,
+                    {
+                        "type": "AppointmentCancelled",
+                        "appointment_id": str(appointment_id)
+                    }
+                )
+
+        except Exception as notice_error:
+            conn.rollback()
+            print("Doctor cancel notice error:", notice_error)
+
+        return jsonify({
+            "status": "success",
+            "message": "Appointment cancelled"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Doctor Cancel Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to cancel the appointment"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# DOCTOR VIEWS A PATIENT'S REPORTS (read only)
+# Only for patients the doctor has actually accepted.
+# ============================================================
+
+# True if this doctor has an accepted appointment with this patient.
+# Pending, Rejected and Cancelled bookings do not count.
+def doctor_has_access(cursor, doctor_id, patient_id):
+    cursor.execute("""
+        SELECT 1
+        FROM appointments
+        WHERE doctor_id = %s
+          AND patient_id = %s
+          AND status IN ('Scheduled', 'Completed', 'Rescheduled')
+        LIMIT 1
+    """, (doctor_id, patient_id))
+
+    return cursor.fetchone() is not None
+
+
+# ----- The list of a patient's reports -----
+@app.route(
+    "/api/doctors/<int:doctor_id>/patients/<int:patient_id>/reports",
+    methods=["GET"]
+)
+def doctor_get_patient_reports(doctor_id, patient_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        if not doctor_has_access(cursor, doctor_id, patient_id):
+            return jsonify({
+                "status": "error",
+                "message": "You do not have access to this patient's reports"
+            }), 403
+
+        cursor.execute("""
+            SELECT
+                report_id,
+                report_type,
+                description,
+                report_date,
+                file_url
+            FROM medical_reports
+            WHERE patient_id = %s
+            ORDER BY uploaded_at DESC, report_id DESC
+        """, (patient_id,))
+
+        reports = []
+
+        for row in cursor.fetchall():
+            # The app needs to know whether the file is a PDF or a picture
+            extension = os.path.splitext(row[4])[1].lower()
+
+            reports.append({
+                "report_id": row[0],
+                "report_type": row[1],
+                "description": row[2],
+                "report_date": str(row[3]) if row[3] else None,
+                "file_kind": "pdf" if extension == ".pdf" else "image"
+            })
+
+        return jsonify({
+            "status": "success",
+            "reports": reports
+        }), 200
+
+    except Exception as e:
+        print("Doctor Get Reports Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load reports"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- Open one report's file (PDF or picture) -----
+@app.route(
+    "/api/doctors/<int:doctor_id>/patients/<int:patient_id>/reports/<int:report_id>/file",
+    methods=["GET"]
+)
+def doctor_get_report_file(doctor_id, patient_id, report_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        if not doctor_has_access(cursor, doctor_id, patient_id):
+            return jsonify({
+                "status": "error",
+                "message": "You do not have access to this patient's reports"
+            }), 403
+
+        # The report must belong to this patient
+        cursor.execute("""
+            SELECT file_url
+            FROM medical_reports
+            WHERE report_id = %s
+              AND patient_id = %s
+        """, (report_id, patient_id))
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Report not found"
+            }), 404
+
+        # Send the saved file back to the app
+        return send_from_directory(
+            os.path.abspath(REPORTS_FOLDER),
+            row[0]
+        )
+
+    except Exception as e:
+        print("Doctor Get Report File Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to open the report"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# PHARMACY: LIST OF ALL MEDICINE ORDERS
+# Protected by the secret ADMIN_KEY from the .env file, sent in
+# the "X-Admin-Key" header. (The status route is further above.)
+# ============================================================
+
+# True if the request carries the correct ADMIN_KEY
+def is_admin_request():
+    import hmac
+
+    admin_key = os.getenv("ADMIN_KEY") or ""
+    sent_key = request.headers.get("X-Admin-Key") or ""
+
+    # compare_digest compares in a way that cannot be timed
+    return bool(admin_key) and hmac.compare_digest(admin_key, sent_key)
+
+
+@app.route("/api/pharmacy/orders", methods=["GET"])
+def pharmacy_list_orders():
+    if not is_admin_request():
+        return jsonify({
+            "status": "error",
+            "message": "Not allowed"
+        }), 403
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The newest 100 orders, with the patient's name and phone.
+        # One row comes back per medicine, so we group them below.
+        cursor.execute("""
+            SELECT
+                o.order_id,
+                o.order_date,
+                o.status,
+                o.total_amount,
+                o.payment_method,
+                o.delivery_address,
+                u.full_name,
+                u.phone,
+                mc.medicine_name,
+                oi.quantity
+            FROM (
+                SELECT *
+                FROM medicine_orders
+                ORDER BY order_date DESC, order_id DESC
+                LIMIT 100
+            ) o
+            JOIN patients p
+                ON o.patient_id = p.patient_id
+            JOIN users u
+                ON p.user_id = u.user_id
+            LEFT JOIN medicine_order_items oi
+                ON oi.order_id = o.order_id
+            LEFT JOIN medicine_catalog mc
+                ON oi.medicine_id = mc.medicine_id
+            ORDER BY o.order_date DESC, o.order_id DESC, oi.id ASC
+        """)
+
+        orders = {}
+
+        for row in cursor.fetchall():
+            order_id = row[0]
+
+            if order_id not in orders:
+                orders[order_id] = {
+                    "order_id": order_id,
+                    "order_date": str(row[1])[:16],
+                    "status": row[2],
+                    "total_amount": float(row[3]),
+                    "payment_method": row[4],
+                    "delivery_address": row[5],
+                    "patient_name": row[6],
+                    "patient_phone": row[7],
+                    "items": []
+                }
+
+            if row[8] is not None:
+                orders[order_id]["items"].append({
+                    "medicine": row[8],
+                    "quantity": row[9]
+                })
+
+        return jsonify({
+            "status": "success",
+            "orders": list(orders.values())
+        }), 200
+
+    except Exception as e:
+        print("Pharmacy List Orders Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the orders"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# PHARMACY WEB PAGE
+# Open  http://<server address>:5000/pharmacy  in any browser.
+# The page itself holds no data. It asks for the pharmacy key,
+# and every request it makes to the server carries that key.
+# ============================================================
+
+PHARMACY_PAGE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pharmacy - Rural Telemedicine</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; margin: 0;
+         background: #f7fafc; color: #26384a; }
+  header { background: #3f6fa8; color: #fff; padding: 16px 20px;
+           display: flex; align-items: center; justify-content: space-between; }
+  h1 { font-size: 20px; margin: 0; }
+  main { max-width: 900px; margin: 0 auto; padding: 20px; }
+  .card { background: #fff; border: 1px solid #dce5ee; border-radius: 14px;
+          padding: 16px; margin-bottom: 14px; }
+  .row { display: flex; justify-content: space-between; align-items: center;
+         flex-wrap: wrap; gap: 8px; }
+  .muted { color: #6b7c8c; font-size: 13px; }
+  .badge { padding: 3px 12px; border-radius: 20px; font-size: 12px;
+           font-weight: bold; color: #fff; }
+  .Placed { background: #3f6fa8; } .Confirmed { background: #5c6bc0; }
+  .Dispatched { background: #ef8f1a; } .Delivered { background: #2e9e5b; }
+  .Cancelled { background: #d64545; }
+  button { border: 0; border-radius: 10px; padding: 10px 16px; font-size: 14px;
+           font-weight: bold; cursor: pointer; background: #3f6fa8; color: #fff; }
+  button.light { background: #fff; color: #3f6fa8; border: 1px solid #3f6fa8; }
+  button.danger { background: #fff; color: #d64545; border: 1px solid #d64545; }
+  input, select { padding: 10px; border-radius: 10px; border: 1px solid #c4d1de;
+                  font-size: 15px; }
+  ul { margin: 8px 0; padding-left: 20px; }
+  #message { padding: 10px 14px; border-radius: 10px; margin-bottom: 14px;
+             display: none; }
+  #message.ok { background: #e6f6ec; color: #1f7a45; display: block; }
+  #message.bad { background: #fde8e8; color: #b93030; display: block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Pharmacy orders</h1>
+  <button class="light" id="logoutButton" style="display:none">Log out</button>
+</header>
+<main>
+  <div id="message"></div>
+
+  <div id="loginBox" class="card">
+    <p>Enter the pharmacy key to see the orders.</p>
+    <input id="keyInput" type="password" placeholder="Pharmacy key" autocomplete="off">
+    <button id="loginButton">Open</button>
+  </div>
+
+  <div id="ordersBox" style="display:none">
+    <div class="row" style="margin-bottom:14px">
+      <div>
+        <label for="filter">Show: </label>
+        <select id="filter">
+          <option value="">All orders</option>
+          <option value="Placed">New (Placed)</option>
+          <option value="Confirmed">Confirmed</option>
+          <option value="Dispatched">Dispatched</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="muted" id="countText"></div>
+    </div>
+    <div id="orderList"></div>
+  </div>
+</main>
+
+<script>
+  // The key lives only in this variable. It is forgotten when the page closes.
+  var adminKey = "";
+  var allOrders = [];
+  var refreshTimer = null;
+
+  // The next steps an order can take
+  var nextSteps = {
+    Placed: ["Confirmed", "Cancelled"],
+    Confirmed: ["Dispatched", "Cancelled"],
+    Dispatched: ["Delivered", "Cancelled"]
+  };
+  var buttonText = {
+    Confirmed: "Confirm", Dispatched: "Dispatch",
+    Delivered: "Mark delivered", Cancelled: "Cancel order"
+  };
+
+  // Creates an element with plain text (never raw HTML, so names and
+  // addresses typed by patients cannot run as code)
+  function el(tag, text, cls) {
+    var e = document.createElement(tag);
+    if (text !== undefined) e.textContent = text;
+    if (cls) e.className = cls;
+    return e;
+  }
+
+  function showMessage(text, bad) {
+    var box = document.getElementById("message");
+    box.textContent = text;
+    box.className = bad ? "bad" : "ok";
+    setTimeout(function () { box.className = ""; box.textContent = ""; }, 5000);
+  }
+
+  // Sends a request to the server with the pharmacy key
+  async function api(path, options) {
+    options = options || {};
+    var response = await fetch(path, {
+      method: options.method || "GET",
+      headers: { "X-Admin-Key": adminKey, "Content-Type": "application/json" },
+      body: options.body
+    });
+    var data = {};
+    try { data = await response.json(); } catch (e) {}
+    if (!response.ok) { throw new Error(data.message || ("Error " + response.status)); }
+    return data;
+  }
+
+  // Draws the list of orders
+  function render() {
+    var filter = document.getElementById("filter").value;
+    var list = document.getElementById("orderList");
+    list.textContent = "";
+
+    var shown = allOrders.filter(function (o) { return !filter || o.status === filter; });
+    document.getElementById("countText").textContent = shown.length + " order(s)";
+
+    if (shown.length === 0) {
+      list.appendChild(el("p", "No orders to show.", "muted"));
+      return;
+    }
+
+    shown.forEach(function (order) {
+      var card = el("div", undefined, "card");
+
+      var top = el("div", undefined, "row");
+      top.appendChild(el("strong", "Order #" + order.order_id));
+      top.appendChild(el("span", order.status, "badge " + order.status));
+      card.appendChild(top);
+
+      card.appendChild(el("div", order.patient_name + "  |  " + order.patient_phone));
+      card.appendChild(el("div", "Address: " + order.delivery_address, "muted"));
+      card.appendChild(el("div", "Ordered: " + order.order_date + "  |  Payment: " + order.payment_method, "muted"));
+
+      var ul = el("ul");
+      order.items.forEach(function (item) {
+        ul.appendChild(el("li", item.medicine + " x " + item.quantity));
+      });
+      card.appendChild(ul);
+
+      card.appendChild(el("div",
+        order.total_amount > 0 ? "Total: Rs " + order.total_amount.toFixed(2)
+                             : "Price to be confirmed by the pharmacy",
+        "muted"));
+
+      // One button for each next step
+      var steps = nextSteps[order.status] || [];
+      if (steps.length > 0) {
+        var actions = el("div", undefined, "row");
+        actions.style.marginTop = "12px";
+        actions.style.justifyContent = "flex-start";
+        steps.forEach(function (step) {
+          var b = el("button", buttonText[step], step === "Cancelled" ? "danger" : "");
+          b.onclick = function () { changeStatus(order.order_id, step); };
+          actions.appendChild(b);
+        });
+        card.appendChild(actions);
+      }
+
+      list.appendChild(card);
+    });
+  }
+
+  // Loads the orders from the server
+  async function loadOrders() {
+    var data = await api("/api/pharmacy/orders");
+    allOrders = data.orders;
+    render();
+  }
+
+  // Moves an order to its next stage. The patient gets a notification.
+  async function changeStatus(orderId, status) {
+    if (status === "Cancelled" && !confirm("Cancel order #" + orderId + "? The patient will be told.")) {
+      return;
+    }
+    try {
+      await api("/api/medicine-orders/" + orderId + "/status", {
+        method: "PUT",
+        body: JSON.stringify({ status: status })
+      });
+      showMessage("Order #" + orderId + " is now " + status + ".", false);
+      await loadOrders();
+    } catch (e) {
+      showMessage(e.message, true);
+    }
+  }
+
+  async function login() {
+    adminKey = document.getElementById("keyInput").value.trim();
+    document.getElementById("keyInput").value = "";
+    try {
+      await loadOrders();
+      document.getElementById("loginBox").style.display = "none";
+      document.getElementById("ordersBox").style.display = "block";
+      document.getElementById("logoutButton").style.display = "inline-block";
+      // Refresh the list every 15 seconds
+      refreshTimer = setInterval(function () { loadOrders().catch(function () {}); }, 15000);
+    } catch (e) {
+      adminKey = "";
+      showMessage(e.message === "Not allowed" ? "Wrong key." : e.message, true);
+    }
+  }
+
+  function logout() {
+    adminKey = "";
+    allOrders = [];
+    clearInterval(refreshTimer);
+    document.getElementById("orderList").textContent = "";
+    document.getElementById("ordersBox").style.display = "none";
+    document.getElementById("logoutButton").style.display = "none";
+    document.getElementById("loginBox").style.display = "block";
+  }
+
+  document.getElementById("loginButton").onclick = login;
+  document.getElementById("keyInput").onkeydown = function (e) { if (e.key === "Enter") { login(); } };
+  document.getElementById("logoutButton").onclick = logout;
+  document.getElementById("filter").onchange = render;
+</script>
+</body>
+</html>"""
+
+
+@app.route("/pharmacy", methods=["GET"])
+def pharmacy_page():
+    from flask import Response
+
+    response = Response(PHARMACY_PAGE, mimetype="text/html")
+
+    # The page may only talk to this server, and must not be cached
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'none'; connect-src 'self'; "
+        "style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
+        "base-uri 'none'; form-action 'none'"
+    )
+
+    return response
+
+# ============================================================
+# FIRST AID GUIDE
+# General information only, with nothing private in it, so these
+# two routes need no login (first aid must be quick to reach).
+# ============================================================
+
+# ----- The list of topics (names only) -----
+@app.route("/api/first-aid", methods=["GET"])
+def first_aid_list():
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # One row for each topic name (exact repeats are hidden).
+        # DISTINCT ON keeps the first row of each name, and the ORDER BY
+        # makes that the priority one, then the oldest.
+        cursor.execute("""
+            SELECT DISTINCT ON (LOWER(condition_name))
+                first_aid_id,
+                condition_name,
+                COALESCE(category, 'More topics'),
+                is_priority,
+                reviewed
+            FROM first_aid_guidance
+            ORDER BY LOWER(condition_name),
+                     (is_priority = 'Y') DESC,
+                     first_aid_id
+        """)
+
+        topics = []
+
+        for row in cursor.fetchall():
+            topics.append({
+                "first_aid_id": row[0],
+                "name": row[1],
+                "category": row[2],
+                "is_priority": row[3] == 'Y',
+                "reviewed": row[4] == 'Y'
+            })
+
+        # Important topics first, then the rest, each in alphabetical order
+        topics.sort(key=lambda t: (not t["is_priority"], t["name"].lower()))
+
+        return jsonify({
+            "status": "success",
+            "topics": topics
+        }), 200
+
+    except Exception as e:
+        print("First Aid List Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the first aid topics"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- The full text of one topic -----
+@app.route("/api/first-aid/<int:first_aid_id>", methods=["GET"])
+def first_aid_detail(first_aid_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                first_aid_id,
+                condition_name,
+                symptoms,
+                first_aid_steps,
+                do_not_do,
+                when_to_seek_help,
+                emergency_warning,
+                COALESCE(category, 'More topics'),
+                reviewed
+            FROM first_aid_guidance
+            WHERE first_aid_id = %s
+        """, (first_aid_id,))
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Topic not found"
+            }), 404
+
+        return jsonify({
+            "status": "success",
+            "topic": {
+                "first_aid_id": row[0],
+                "name": row[1],
+                "symptoms": row[2],
+                "steps": row[3],
+                "do_not_do": row[4],
+                "when_to_seek_help": row[5],
+                "emergency_warning": row[6],
+                "category": row[7],
+                "reviewed": row[8] == 'Y'
+            }
+        }), 200
+
+    except Exception as e:
+        print("First Aid Detail Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the topic"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+
+# ----- The patient closes their own SOS (they are safe) -----
+@app.route(
+    "/api/patients/<int:patient_id>/sos/<int:sos_id>/close",
+    methods=["PUT"]
+)
+def patient_close_sos(patient_id, sos_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Only this patient's own request, and only if still open
+        cursor.execute("""
+            UPDATE sos_requests
+            SET status = 'Closed',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE sos_id = %s
+              AND patient_id = %s
+              AND status <> 'Closed'
+            RETURNING sos_id
+        """, (sos_id, patient_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "SOS request not found or already closed"
+            }), 404
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "SOS request closed"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Patient Close SOS Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to close the SOS request"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# ADMIN PORTAL
+# Login with username and password gives a signed token (8 hours).
+# Every other admin route needs that token in the Authorization header.
+# ============================================================
+
+ADMIN_TOKEN_SECRET = os.getenv("ADMIN_TOKEN_SECRET")
+ADMIN_TOKEN_HOURS = 8
+
+admin_serializer = URLSafeTimedSerializer(
+    ADMIN_TOKEN_SECRET or "unused", salt="admin-login"
+)
+
+# Too many wrong passwords: lock that address + username for 15 minutes
+MAX_LOGIN_FAILS = 5
+LOGIN_LOCK_SECONDS = 15 * 60
+login_failures = {}  # key -> (number of failures, time of the first one)
+
+
+def login_is_locked(key):
+    entry = login_failures.get(key)
+
+    if not entry:
+        return False
+
+    count, since = entry
+
+    if time.time() - since > LOGIN_LOCK_SECONDS:
+        login_failures.pop(key, None)
+        return False
+
+    return count >= MAX_LOGIN_FAILS
+
+
+def note_login_failure(key):
+    count, since = login_failures.get(key, (0, time.time()))
+    login_failures[key] = (count + 1, since)
+
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        # Without a secret, tokens could be forged, so refuse everything
+        if not ADMIN_TOKEN_SECRET:
+            return jsonify({
+                "status": "error",
+                "message": "Admin login is not configured on the server"
+            }), 503
+
+        header = request.headers.get("Authorization", "")
+
+        if not header.startswith("Bearer "):
+            return jsonify({
+                "status": "error",
+                "message": "Please login"
+            }), 401
+
+        try:
+            admin_serializer.loads(
+                header[7:], max_age=ADMIN_TOKEN_HOURS * 3600
+            )
+        except (SignatureExpired, BadSignature):
+            return jsonify({
+                "status": "error",
+                "message": "Session expired. Please login again."
+            }), 401
+
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+@app.route("/api/admin/login", methods=["POST"])
+def admin_login():
+    if not ADMIN_TOKEN_SECRET:
+        return jsonify({
+            "status": "error",
+            "message": "Admin login is not configured on the server"
+        }), 503
+
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+
+    key = f"{request.remote_addr}|{username.lower()}"
+
+    if login_is_locked(key):
+        return jsonify({
+            "status": "error",
+            "message": "Too many wrong attempts. Try again in 15 minutes."
+        }), 429
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT admin_id, password_hash
+            FROM admins
+            WHERE username = %s
+              AND is_active = TRUE
+        """, (username,))
+
+        row = cursor.fetchone()
+
+        # Same message for a wrong username and a wrong password
+        if not row or not check_password_hash(row[1], password):
+            note_login_failure(key)
+            return jsonify({
+                "status": "error",
+                "message": "Incorrect username or password"
+            }), 401
+
+        login_failures.pop(key, None)
+
+        token = admin_serializer.dumps({"admin_id": row[0]})
+
+        return jsonify({
+            "status": "success",
+            "token": token
+        }), 200
+
+    except Exception as e:
+        print("Admin Login Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Login failed"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+            
+
+
+@app.route("/api/admin/stats", methods=["GET"])
+@admin_required
+def admin_stats():
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                (SELECT COUNT(*) FROM patients),
+                (SELECT COUNT(*) FROM doctors WHERE approval_status = 'Approved'),
+                (SELECT COUNT(*) FROM doctors WHERE approval_status = 'Pending'),
+                (SELECT COUNT(*) FROM sos_requests WHERE status <> 'Closed')
+        """)
+
+        row = cursor.fetchone()
+
+        return jsonify({
+            "status": "success",
+            "stats": {
+                "patients": row[0],
+                "doctors": row[1],
+                "pending_doctors": row[2],
+                "active_sos": row[3]
+            }
+        }), 200
+
+    except Exception as e:
+        print("Admin Stats Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the numbers"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+@app.route("/api/admin/doctors/pending", methods=["GET"])
+@admin_required
+def admin_pending_doctors():
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                d.doctor_id,
+                u.full_name,
+                u.phone,
+                s.spec_name,
+                d.qualification,
+                d.experience_years,
+                d.license_number
+            FROM doctors d
+            JOIN users u
+                ON d.user_id = u.user_id
+            JOIN specializations s
+                ON d.specialization_id = s.spec_id
+            WHERE d.approval_status = 'Pending'
+            ORDER BY d.doctor_id
+        """)
+
+        doctors = []
+
+        for row in cursor.fetchall():
+            doctors.append({
+                "doctor_id": row[0],
+                "full_name": row[1],
+                "phone": row[2],
+                "specialization": row[3],
+                "qualification": row[4],
+                "experience_years": row[5],
+                "license_number": row[6]
+            })
+
+        return jsonify({
+            "status": "success",
+            "doctors": doctors
+        }), 200
+
+    except Exception as e:
+        print("Admin Pending Doctors Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the requests"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+@app.route("/api/admin/doctors/<int:doctor_id>/decision", methods=["PUT"])
+@admin_required
+def admin_decide_doctor(doctor_id):
+    data = request.get_json(silent=True) or {}
+    decision = data.get("decision")
+
+    if decision not in ("approve", "reject"):
+        return jsonify({
+            "status": "error",
+            "message": "decision must be approve or reject"
+        }), 400
+
+    new_status = "Approved" if decision == "approve" else "Rejected"
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Only a Pending request can be decided, and only once
+        cursor.execute("""
+            UPDATE doctors
+            SET approval_status = %s
+            WHERE doctor_id = %s
+              AND approval_status = 'Pending'
+            RETURNING doctor_id
+        """, (new_status, doctor_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "Request not found or already decided"
+            }), 404
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "approval_status": new_status
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Admin Decide Doctor Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save the decision"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+@app.route("/api/admin/sos", methods=["GET"])
+@admin_required
+def admin_list_sos():
+    # Fixed pieces of SQL only, nothing from the request goes into the query
+    flt = request.args.get("filter", "all")
+
+    if flt == "active":
+        where = "WHERE s.status <> 'Closed'"
+    elif flt == "closed":
+        where = "WHERE s.status = 'Closed'"
+    else:
+        where = ""
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(f"""
+            SELECT
+                s.sos_id,
+                s.request_time,
+                s.updated_at,
+                s.status,
+                s.location_lat,
+                s.location_lng,
+                s.emergency_type,
+                u.full_name,
+                u.phone,
+                p.emergency_contact_name,
+                p.emergency_contact_phone
+            FROM sos_requests s
+            JOIN patients p
+                ON s.patient_id = p.patient_id
+            JOIN users u
+                ON p.user_id = u.user_id
+            {where}
+            ORDER BY s.request_time DESC
+            LIMIT 100
+        """)
+
+        sos_list = []
+
+        for row in cursor.fetchall():
+            sos_list.append({
+                "sos_id": row[0],
+                "request_time": str(row[1])[:16],
+                "updated_at": str(row[2])[:16] if row[2] else None,
+                "status": row[3],
+                "latitude": float(row[4]) if row[4] is not None else None,
+                "longitude": float(row[5]) if row[5] is not None else None,
+                "emergency_type": row[6],
+                "patient_name": row[7],
+                "patient_phone": row[8],
+                "contact_name": row[9],
+                "contact_phone": row[10]
+            })
+
+        return jsonify({
+            "status": "success",
+            "sos": sos_list
+        }), 200
+
+    except Exception as e:
+        print("Admin List SOS Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the SOS requests"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+@app.route("/api/admin/sos/<int:sos_id>/status", methods=["PUT"])
+@admin_required
+def admin_update_sos_status(sos_id):
+    data = request.get_json(silent=True) or {}
+    new_status = data.get("status")
+
+    if new_status not in ["Requested", "Assigned", "Enroute", "Arrived", "Closed"]:
+        return jsonify({
+            "status": "error",
+            "message": "Invalid SOS status"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE sos_requests
+            SET status = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE sos_id = %s
+            RETURNING sos_id
+        """, (new_status, sos_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "SOS request not found"
+            }), 404
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "new_status": new_status
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Admin Update SOS Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to update the SOS status"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+@app.route("/api/admin/users/<group>", methods=["GET"])
+@admin_required
+def admin_list_users(group):
+    if group == "patients":
+        sql = """
+            SELECT p.patient_id, u.full_name, u.phone, u.status, NULL
+            FROM patients p
+            JOIN users u ON p.user_id = u.user_id
+            ORDER BY u.full_name
+            LIMIT 500
+        """
+    elif group == "doctors":
+        sql = """
+            SELECT d.doctor_id, u.full_name, u.phone, u.status, d.approval_status
+            FROM doctors d
+            JOIN users u ON d.user_id = u.user_id
+            ORDER BY u.full_name
+            LIMIT 500
+        """
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "Unknown group"
+        }), 404
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(sql)
+
+        users = []
+
+        for row in cursor.fetchall():
+            users.append({
+                "id": row[0],
+                "full_name": row[1],
+                "phone": row[2],
+                "active": row[3] == "Active",
+                "approval_status": row[4]
+            })
+
+        return jsonify({
+            "status": "success",
+            "users": users
+        }), 200
+
+    except Exception as e:
+        print("Admin List Users Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the users"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+@app.route("/api/admin/users/<group>/<int:record_id>/active", methods=["PUT"])
+@admin_required
+def admin_set_user_active(group, record_id):
+    data = request.get_json(silent=True) or {}
+    active = data.get("active")
+
+    if not isinstance(active, bool):
+        return jsonify({
+            "status": "error",
+            "message": "active must be true or false"
+        }), 400
+
+    if group == "patients":
+        sql = """
+            UPDATE users SET status = %s
+            WHERE user_id = (SELECT user_id FROM patients WHERE patient_id = %s)
+            RETURNING user_id
+        """
+    elif group == "doctors":
+        sql = """
+            UPDATE users SET status = %s
+            WHERE user_id = (SELECT user_id FROM doctors WHERE doctor_id = %s)
+            RETURNING user_id
+        """
+    else:
+        return jsonify({
+            "status": "error",
+            "message": "Unknown group"
+        }), 404
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(sql, ("Active" if active else "Inactive", record_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "User not found"
+            }), 404
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Admin Set User Active Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to update the user"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ------------------------------------------------------------
+# MAKE SURE THE DOCTORS TABLE HAS THE approval_status COLUMN
+# Runs every time the server starts. If the column already
+# exists, nothing changes. Doctors are "Approved" by default,
+# so nobody is blocked from logging in.
+# ------------------------------------------------------------
+def ensure_approval_column():
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Adds the column only if it is missing
+        cursor.execute("""
+            ALTER TABLE doctors
+            ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20)
+            NOT NULL DEFAULT 'Approved'
+        """)
+
+        conn.commit()
+        print("Doctors approval column is ready")
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Approval column setup error:", e)
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# Run it once when the server starts
+ensure_approval_column()
+
+if __name__ == "__main__":
+    # Start the reminder timer (appointment and follow-up reminders)
+    start_reminder_thread()
+
+    app.run(
         host="0.0.0.0",
         port=5000,
         debug=False

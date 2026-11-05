@@ -5,6 +5,12 @@
 <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 <uses-permission android:name="android.permission.INTERNET"/>
 <uses-permission android:name="android.permission.CAMERA"/>
+<!-- Medicine reminders: vibrate the phone -->
+<uses-permission android:name="android.permission.VIBRATE"/>
+<!-- Medicine reminders: fire on the exact minute (the patient must allow it) -->
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+<!-- Medicine reminders: set them up again after the phone restarts -->
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
    <queries>
         <intent>
              <action android:name="android.speech.RecognitionService"/>
@@ -42,6 +48,22 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Medicine reminders: these let scheduled notifications fire,
+             and come back after the phone restarts -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -52,6 +74,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- First aid: lets the app open the phone's dialer (tel: numbers) -->
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
         </intent>
     </queries>
 </manifest>

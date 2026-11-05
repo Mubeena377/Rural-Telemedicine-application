@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
+import 'report_viewer_screen.dart';
 
 // ============================================================
 // DOCTOR PATIENT HISTORY SCREEN
@@ -34,6 +35,12 @@ class _DoctorPatientHistoryScreenState
   List<Map<String, dynamic>> consultations = [];
   List<Map<String, dynamic>> records = [];
 
+  // The patient's reports (the doctor can only read them)
+  List<Map<String, dynamic>> reports = [];
+
+  // Holds a message if the reports could not be loaded
+  String? reportsError;
+
   // True while loading (shows a spinner)
   bool isLoading = true;
 
@@ -62,6 +69,7 @@ class _DoctorPatientHistoryScreenState
   void initState() {
     super.initState();
     loadRecord(); // Start loading right away
+    loadReports(); // The reports load separately
   }
 
   // Loads the patient's record from the server
@@ -224,6 +232,133 @@ class _DoctorPatientHistoryScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Loads the patient's reports. The server refuses if the doctor
+  // has no accepted appointment with this patient.
+  Future<void> loadReports() async {
+    try {
+      // Ask the server (function we added in api_service.dart)
+      final list = await ApiService.getPatientReportsForDoctor(
+        doctorId: widget.doctorId,
+        patientId: widget.patientId,
+      );
+
+      // If the doctor left this screen while waiting, stop here
+      if (!mounted) return;
+
+      setState(() {
+        reports = list;
+        reportsError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        reportsError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  // Opens one report in the viewer
+  void openReport(Map<String, dynamic> report) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReportViewerScreen(
+          title: (report['description'] ?? 'Report').toString(),
+          fileKind: (report['file_kind'] ?? 'image').toString(),
+          // How the viewer gets the file from the server
+          loadFile: () => ApiService.getReportFileForDoctor(
+            doctorId: widget.doctorId,
+            patientId: widget.patientId,
+            reportId: report['report_id'] as int,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // The card for one report (tap to open it)
+  Widget reportCard(Map<String, dynamic> report) {
+    final type = (report['report_type'] ?? 'Other').toString();
+    final isPdf = report['file_kind'] == 'pdf';
+
+    // The icon, colour and name for each kind of report
+    final IconData icon = type == 'Lab'
+        ? Icons.science_outlined
+        : type == 'Imaging'
+            ? Icons.document_scanner_outlined
+            : Icons.description_outlined;
+
+    final Color color = type == 'Lab'
+        ? Colors.teal
+        : type == 'Imaging'
+            ? Colors.indigo
+            : Colors.blueGrey;
+
+    final label = type == 'Lab'
+        ? 'Lab test'
+        : type == 'Imaging'
+            ? 'X-ray / Scan'
+            : 'Other';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      // InkWell gives the ripple effect when tapped
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => openReport(report),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: color.withOpacity(0.12),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (report['description'] ?? '').toString(),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(
+                          isPdf ? Icons.picture_as_pdf : Icons.image,
+                          size: 14,
+                          color: isPdf ? Colors.red : Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$label • ${report['report_date'] ?? ''}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -426,6 +561,17 @@ class _DoctorPatientHistoryScreenState
             )
           else
             ...records.map(recordCard),
+
+          sectionHeader('Reports', Icons.folder_open),
+          if (reportsError != null)
+            emptyMessage(Icons.lock_outline, reportsError!)
+          else if (reports.isEmpty)
+            emptyMessage(
+              Icons.folder_open,
+              'The patient has not uploaded any reports.',
+            )
+          else
+            ...reports.map(reportCard),
 
           sectionHeader('Your consultations', Icons.history),
           if (consultations.isEmpty)
