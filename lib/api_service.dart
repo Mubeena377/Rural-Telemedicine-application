@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'app_language.dart'; // appLanguage: the language the user chose
 
 class ApiService {
    // ----------------------------------------------------------
@@ -649,6 +650,179 @@ static Future<List<Map<String, dynamic>>> getDoctorConsultations(
       throw Exception(data['message'] ?? 'Failed to load consultations.');
     } catch (e) {
       throw Exception('Unable to load consultations: $e');
+    }
+  }
+
+  // ============================================================
+  // GET DOCTOR PROFILE
+  // Loads the doctor's own details and the spoken languages.
+  // ============================================================
+  static Future<Map<String, dynamic>> getDoctorProfile(int doctorId) async {
+    try {
+      // GET request to the .../profile route
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/doctors/$doctorId/profile'),
+      );
+
+      // Convert the server's JSON reply into a Dart map
+      final data = jsonDecode(response.body);
+
+      // 200 means the profile was loaded
+      if (response.statusCode == 200 && data['status'] == 'success') {
+        return {
+          'success': true,
+          ...data,
+        };
+      }
+
+      // The server replied with an error message
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to load the profile',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Connection error: $e',
+      };
+    }
+  }
+
+  // ============================================================
+  // SAVE DOCTOR LANGUAGES
+  // Saves the languages the doctor can speak.
+  // ============================================================
+  static Future<Map<String, dynamic>> saveDoctorLanguages({
+    required int doctorId,
+    required List<String> languages,
+  }) async {
+    try {
+      // PUT request to the .../languages route
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/doctors/$doctorId/languages'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'languages': languages,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      // 200 means the languages were saved
+      if (response.statusCode == 200 && data['status'] == 'success') {
+        return {
+          'success': true,
+          ...data,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Failed to save the languages',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Connection error: $e',
+      };
+    }
+  }
+
+  // ============================================================
+  // REGISTER A RESPONDER (an ambulance team or a hospital)
+  // ============================================================
+  static Future<Map<String, dynamic>> registerResponder({
+    required String type, // Ambulance or Hospital
+    required String name,
+    required String phone,
+    String? contactPerson,
+    String? vehicleNumber,
+    String? address,
+  }) async {
+    try {
+      // POST request to the /api/responders/register route
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/responders/register'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'type': type,
+          'name': name,
+          'phone': phone,
+          'contact_person': contactPerson,
+          'vehicle_number': vehicleNumber,
+          'address': address,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      // 201 = newly registered, 200 = this phone was already registered
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return {
+          'success': true,
+          ...data,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Registration failed',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Connection error: $e',
+      };
+    }
+  }
+
+  // ============================================================
+  // SAVE A RESPONDER'S PHONE TOKEN (so SOS alerts can reach it)
+  // ============================================================
+  static Future<void> saveResponderDeviceToken({
+    required int responderId,
+    required String token, // The phone's Firebase token
+  }) async {
+    try {
+      await http.post(
+        Uri.parse('$baseUrl/api/responders/$responderId/device-token'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'token': token,
+        }),
+      );
+    } catch (e) {
+      // If this fails, the alert will not arrive, but the app still works
+      print('Could not save responder device token: $e');
+    }
+  }
+
+  // ============================================================
+  // GET THE OPEN SOS REQUESTS (for an ambulance or hospital)
+  // ============================================================
+  static Future<List<Map<String, dynamic>>> getResponderOpenSos(
+    int responderId,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/responders/$responderId/sos'),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(data['sos']);
+      }
+
+      throw Exception(data['message'] ?? 'Failed to load the SOS requests');
+    } catch (e) {
+      throw Exception('Connection error: $e');
     }
   }
 
@@ -1962,7 +2136,8 @@ static Future<Map<String, dynamic>> getDoctorConsultationHistory(
     try {
       // GET request to the /api/first-aid route
       final response = await http.get(
-        Uri.parse('$baseUrl/api/first-aid'),
+        // The language is added so the server can answer in it
+        Uri.parse('$baseUrl/api/first-aid?lang=${appLanguage.value}'),
       );
 
       // Convert the server's JSON reply into a Dart map
@@ -1994,7 +2169,10 @@ static Future<Map<String, dynamic>> getDoctorConsultationHistory(
     try {
       // GET request to the /api/first-aid/<id> route
       final response = await http.get(
-        Uri.parse('$baseUrl/api/first-aid/$firstAidId'),
+        // The language is added so the server can answer in it
+        Uri.parse(
+          '$baseUrl/api/first-aid/$firstAidId?lang=${appLanguage.value}',
+        ),
       );
 
       // Convert the server's JSON reply into a Dart map

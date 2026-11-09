@@ -809,6 +809,15 @@ def active_sos():
 
         sos_id = cursor.fetchone()[0]
 
+
+        # Alert every registered ambulance and hospital (in the background,
+        # so the patient's SOS is never slowed down)
+        threading.Thread(
+            target=notify_responders_of_sos,
+            args=(sos_id, patient_id),
+            daemon=True
+        ).start()        
+
         conn.commit()
 
         cursor.close()
@@ -1505,7 +1514,7 @@ def get_doctors():
                 d.about,
                 d.consultation_fee,
                 d.is_available,
-                d.approval_status
+                d.languages
             FROM doctors d
             JOIN users u
                 ON d.user_id = u.user_id
@@ -1534,7 +1543,8 @@ def get_doctors():
                 "experience_years": doctor[7],
                 "about": doctor[8],
                 "consultation_fee": float(doctor[9]),
-                "is_available": doctor[10]
+                "is_available": doctor[10],
+                "languages": languages_to_list(doctor[11])
             })
 
         cursor.close()
@@ -2588,10 +2598,22 @@ def save_prescription():
                 patient_user_id = info[0]
                 doctor_name = info[1]
 
-                title = "New prescription"
-                message = (
-                    f"{doctor_name} has issued your prescription. "
-                    "You can order the medicines within 7 days."
+                # Find out which language the patient chose
+                cursor.execute(
+                    "SELECT language FROM users WHERE user_id = %s",
+                    (patient_user_id,)
+                )
+                language_row = cursor.fetchone()
+                patient_language = (
+                    language_row[0] if language_row else "en_IN"
+                )
+
+                # Get the title and texts in the patient's language
+                # (English is used if the language is missing)
+                title, message, push_text = notif_text(
+                    "PrescriptionIssued",
+                    patient_language,
+                    doctor_name=doctor_name
                 )
 
                 # Save the notice (for the Alerts list)
@@ -2603,11 +2625,12 @@ def save_prescription():
 
                 conn.commit()
 
-                # Send the push notification to the patient's phone(s)
+                # Send the push notification to the patient's phone(s),
+                # in the same language
                 send_push_to_user(
                     patient_user_id,
                     title,
-                    message,
+                    push_text,
                     {
                         "type": "PrescriptionIssued",
                         "prescription_id": str(prescription_id)
@@ -4321,6 +4344,90 @@ NOTIFICATION_TEXTS = {
             "push": "{doctor_name} {date} তারিখে {time} টায় আপনার অ্যাপয়েন্টমেন্ট গ্রহণ করতে পারেননি। অনুগ্রহ করে অন্য সময় বুক করুন।",
         },
     },  
+    # ---- Doctor issues a prescription ----
+    "PrescriptionIssued": {
+        "en_IN": {
+            "title": "New prescription",
+            "message": "{doctor_name} has issued your prescription. You can order the medicines within 7 days.",
+            "push": "{doctor_name} has issued your prescription. You can order the medicines within 7 days.",
+        },
+        "hi_IN": {
+            "title": "नया प्रिस्क्रिप्शन",
+            "message": "{doctor_name} ने आपका प्रिस्क्रिप्शन दिया है। आप 7 दिन के अंदर दवाइयाँ मँगवा सकते हैं।",
+            "push": "{doctor_name} ने आपका प्रिस्क्रिप्शन दिया है। आप 7 दिन के अंदर दवाइयाँ मँगवा सकते हैं।",
+        },
+        "kn_IN": {
+            "title": "ಹೊಸ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್",
+            "message": "{doctor_name} ಅವರು ನಿಮ್ಮ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಕೊಟ್ಟಿದ್ದಾರೆ. 7 ದಿನಗಳ ಒಳಗೆ ನೀವು ಔಷಧಿಗಳನ್ನು ಆರ್ಡರ್ ಮಾಡಬಹುದು.",
+            "push": "{doctor_name} ಅವರು ನಿಮ್ಮ ಪ್ರಿಸ್ಕ್ರಿಪ್ಷನ್ ಕೊಟ್ಟಿದ್ದಾರೆ. 7 ದಿನಗಳ ಒಳಗೆ ನೀವು ಔಷಧಿಗಳನ್ನು ಆರ್ಡರ್ ಮಾಡಬಹುದು.",
+        },
+        "ta_IN": {
+            "title": "புதிய மருந்துச் சீட்டு",
+            "message": "{doctor_name} உங்களுக்கு மருந்துச் சீட்டு கொடுத்திருக்கிறார். 7 நாட்களுக்குள் மருந்துகளை ஆர்டர் செய்யலாம்.",
+            "push": "{doctor_name} உங்களுக்கு மருந்துச் சீட்டு கொடுத்திருக்கிறார். 7 நாட்களுக்குள் மருந்துகளை ஆர்டர் செய்யலாம்.",
+        },
+        "te_IN": {
+            "title": "కొత్త ప్రిస్క్రిప్షన్",
+            "message": "{doctor_name} మీకు ప్రిస్క్రిప్షన్ ఇచ్చారు. 7 రోజుల్లోపు మందులను ఆర్డర్ చేయవచ్చు.",
+            "push": "{doctor_name} మీకు ప్రిస్క్రిప్షన్ ఇచ్చారు. 7 రోజుల్లోపు మందులను ఆర్డర్ చేయవచ్చు.",
+        },
+        "ml_IN": {
+            "title": "പുതിയ കുറിപ്പടി",
+            "message": "{doctor_name} നിങ്ങൾക്ക് കുറിപ്പടി നൽകി. 7 ദിവസത്തിനുള്ളിൽ മരുന്നുകൾ ഓർഡർ ചെയ്യാം.",
+            "push": "{doctor_name} നിങ്ങൾക്ക് കുറിപ്പടി നൽകി. 7 ദിവസത്തിനുള്ളിൽ മരുന്നുകൾ ഓർഡർ ചെയ്യാം.",
+        },
+        "mr_IN": {
+            "title": "नवीन प्रिस्क्रिप्शन",
+            "message": "{doctor_name} यांनी तुम्हाला प्रिस्क्रिप्शन दिले आहे. तुम्ही 7 दिवसांच्या आत औषधे मागवू शकता.",
+            "push": "{doctor_name} यांनी तुम्हाला प्रिस्क्रिप्शन दिले आहे. तुम्ही 7 दिवसांच्या आत औषधे मागवू शकता.",
+        },
+        "bn_IN": {
+            "title": "নতুন প্রেসক্রিপশন",
+            "message": "{doctor_name} আপনাকে প্রেসক্রিপশন দিয়েছেন। 7 দিনের মধ্যে ওষুধ অর্ডার করতে পারবেন।",
+            "push": "{doctor_name} আপনাকে প্রেসক্রিপশন দিয়েছেন। 7 দিনের মধ্যে ওষুধ অর্ডার করতে পারবেন।",
+        },
+    },    
+    # ---- Medicine order status (4 statuses) ----
+    "OrderConfirmed": {
+        "en_IN": {"title": "Order Confirmed", "message": "Your order #{order_id} has been confirmed by the pharmacy.", "push": "Your order #{order_id} has been confirmed by the pharmacy."},
+        "hi_IN": {"title": "ऑर्डर कन्फ़र्म हो गया", "message": "आपका ऑर्डर #{order_id} फ़ार्मेसी ने कन्फ़र्म कर दिया है।", "push": "आपका ऑर्डर #{order_id} फ़ार्मेसी ने कन्फ़र्म कर दिया है।"},
+        "kn_IN": {"title": "ಆರ್ಡರ್ ಖಚಿತವಾಗಿದೆ", "message": "ನಿಮ್ಮ ಆರ್ಡರ್ #{order_id} ಅನ್ನು ಔಷಧಿ ಅಂಗಡಿಯವರು ಖಚಿತಪಡಿಸಿದ್ದಾರೆ.", "push": "ನಿಮ್ಮ ಆರ್ಡರ್ #{order_id} ಅನ್ನು ಔಷಧಿ ಅಂಗಡಿಯವರು ಖಚಿತಪಡಿಸಿದ್ದಾರೆ."},
+        "ta_IN": {"title": "ஆர்டர் உறுதியானது", "message": "உங்கள் ஆர்டர் #{order_id} மருந்துக்கடையால் உறுதி செய்யப்பட்டது.", "push": "உங்கள் ஆர்டர் #{order_id} மருந்துக்கடையால் உறுதி செய்யப்பட்டது."},
+        "te_IN": {"title": "ఆర్డర్ నిర్ధారణ అయింది", "message": "మీ ఆర్డర్ #{order_id} ను మందుల షాపు వారు నిర్ధారించారు.", "push": "మీ ఆర్డర్ #{order_id} ను మందుల షాపు వారు నిర్ధారించారు."},
+        "ml_IN": {"title": "ഓർഡർ സ്ഥിരീകരിച്ചു", "message": "നിങ്ങളുടെ ഓർഡർ #{order_id} ഫാർമസി സ്ഥിരീകരിച്ചു.", "push": "നിങ്ങളുടെ ഓർഡർ #{order_id} ഫാർമസി സ്ഥിരീകരിച്ചു."},
+        "mr_IN": {"title": "ऑर्डर कन्फर्म झाली", "message": "तुमची ऑर्डर #{order_id} औषध दुकानाने कन्फर्म केली आहे.", "push": "तुमची ऑर्डर #{order_id} औषध दुकानाने कन्फर्म केली आहे."},
+        "bn_IN": {"title": "অর্ডার কনফার্ম হয়েছে", "message": "আপনার অর্ডার #{order_id} ওষুধের দোকান কনফার্ম করেছে।", "push": "আপনার অর্ডার #{order_id} ওষুধের দোকান কনফার্ম করেছে।"},
+    },
+    "OrderDispatched": {
+        "en_IN": {"title": "Order Dispatched", "message": "Your order #{order_id} is on its way to you.", "push": "Your order #{order_id} is on its way to you."},
+        "hi_IN": {"title": "ऑर्डर भेज दिया गया", "message": "आपका ऑर्डर #{order_id} आपके पास आ रहा है।", "push": "आपका ऑर्डर #{order_id} आपके पास आ रहा है।"},
+        "kn_IN": {"title": "ಆರ್ಡರ್ ಕಳುಹಿಸಲಾಗಿದೆ", "message": "ನಿಮ್ಮ ಆರ್ಡರ್ #{order_id} ನಿಮ್ಮ ಕಡೆಗೆ ಬರುತ್ತಿದೆ.", "push": "ನಿಮ್ಮ ಆರ್ಡರ್ #{order_id} ನಿಮ್ಮ ಕಡೆಗೆ ಬರುತ್ತಿದೆ."},
+        "ta_IN": {"title": "ஆர்டர் அனுப்பப்பட்டது", "message": "உங்கள் ஆர்டர் #{order_id} உங்களை நோக்கி வந்துகொண்டிருக்கிறது.", "push": "உங்கள் ஆர்டர் #{order_id} உங்களை நோக்கி வந்துகொண்டிருக்கிறது."},
+        "te_IN": {"title": "ఆర్డర్ పంపారు", "message": "మీ ఆర్డర్ #{order_id} మీ దగ్గరకు వస్తోంది.", "push": "మీ ఆర్డర్ #{order_id} మీ దగ్గరకు వస్తోంది."},
+        "ml_IN": {"title": "ഓർഡർ അയച്ചു", "message": "നിങ്ങളുടെ ഓർഡർ #{order_id} നിങ്ങളുടെ അടുത്തേക്ക് വരുന്നു.", "push": "നിങ്ങളുടെ ഓർഡർ #{order_id} നിങ്ങളുടെ അടുത്തേക്ക് വരുന്നു."},
+        "mr_IN": {"title": "ऑर्डर पाठवली", "message": "तुमची ऑर्डर #{order_id} तुमच्याकडे येत आहे.", "push": "तुमची ऑर्डर #{order_id} तुमच्याकडे येत आहे."},
+        "bn_IN": {"title": "অর্ডার পাঠানো হয়েছে", "message": "আপনার অর্ডার #{order_id} আপনার কাছে আসছে।", "push": "আপনার অর্ডার #{order_id} আপনার কাছে আসছে।"},
+    },
+    "OrderDelivered": {
+        "en_IN": {"title": "Order Delivered", "message": "Your order #{order_id} has been delivered. Take the medicines as prescribed.", "push": "Your order #{order_id} has been delivered. Take the medicines as prescribed."},
+        "hi_IN": {"title": "ऑर्डर पहुँच गया", "message": "आपका ऑर्डर #{order_id} पहुँचा दिया गया है। दवाइयाँ डॉक्टर के बताए अनुसार लें।", "push": "आपका ऑर्डर #{order_id} पहुँचा दिया गया है। दवाइयाँ डॉक्टर के बताए अनुसार लें।"},
+        "kn_IN": {"title": "ಆರ್ಡರ್ ತಲುಪಿದೆ", "message": "ನಿಮ್ಮ ಆರ್ಡರ್ #{order_id} ತಲುಪಿದೆ. ಡಾಕ್ಟರ್ ಹೇಳಿದಂತೆ ಔಷಧಿಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳಿ.", "push": "ನಿಮ್ಮ ಆರ್ಡರ್ #{order_id} ತಲುಪಿದೆ. ಡಾಕ್ಟರ್ ಹೇಳಿದಂತೆ ಔಷಧಿಗಳನ್ನು ತೆಗೆದುಕೊಳ್ಳಿ."},
+        "ta_IN": {"title": "ஆர்டர் வந்து சேர்ந்தது", "message": "உங்கள் ஆர்டர் #{order_id} வந்து சேர்ந்தது. டாக்டர் சொன்னபடி மருந்துகளைச் சாப்பிடுங்கள்.", "push": "உங்கள் ஆர்டர் #{order_id} வந்து சேர்ந்தது. டாக்டர் சொன்னபடி மருந்துகளைச் சாப்பிடுங்கள்."},
+        "te_IN": {"title": "ఆర్డర్ చేరింది", "message": "మీ ఆర్డర్ #{order_id} చేరింది. డాక్టర్ చెప్పినట్టు మందులు వేసుకోండి.", "push": "మీ ఆర్డర్ #{order_id} చేరింది. డాక్టర్ చెప్పినట్టు మందులు వేసుకోండి."},
+        "ml_IN": {"title": "ഓർഡർ എത്തി", "message": "നിങ്ങളുടെ ഓർഡർ #{order_id} എത്തിച്ചു. ഡോക്ടർ പറഞ്ഞതുപോലെ മരുന്നുകൾ കഴിക്കുക.", "push": "നിങ്ങളുടെ ഓർഡർ #{order_id} എത്തിച്ചു. ഡോക്ടർ പറഞ്ഞതുപോലെ മരുന്നുകൾ കഴിക്കുക."},
+        "mr_IN": {"title": "ऑर्डर पोहोचली", "message": "तुमची ऑर्डर #{order_id} पोहोचली आहे. डॉक्टरांनी सांगितल्याप्रमाणे औषधे घ्या.", "push": "तुमची ऑर्डर #{order_id} पोहोचली आहे. डॉक्टरांनी सांगितल्याप्रमाणे औषधे घ्या."},
+        "bn_IN": {"title": "অর্ডার পৌঁছে গেছে", "message": "আপনার অর্ডার #{order_id} পৌঁছে গেছে। ডাক্তার যেমন বলেছেন সেভাবে ওষুধ খান।", "push": "আপনার অর্ডার #{order_id} পৌঁছে গেছে। ডাক্তার যেমন বলেছেন সেভাবে ওষুধ খান।"},
+    },
+    "OrderCancelled": {
+        "en_IN": {"title": "Order Cancelled", "message": "Your order #{order_id} was cancelled.", "push": "Your order #{order_id} was cancelled."},
+        "hi_IN": {"title": "ऑर्डर रद्द हो गया", "message": "आपका ऑर्डर #{order_id} रद्द कर दिया गया।", "push": "आपका ऑर्डर #{order_id} रद्द कर दिया गया।"},
+        "kn_IN": {"title": "ಆರ್ಡರ್ ರದ್ದಾಗಿದೆ", "message": "ನಿಮ್ಮ ಆರ್ಡರ್ #{order_id} ರದ್ದಾಗಿದೆ.", "push": "ನಿಮ್ಮ ಆರ್ಡರ್ #{order_id} ರದ್ದಾಗಿದೆ."},
+        "ta_IN": {"title": "ஆர்டர் ரத்தானது", "message": "உங்கள் ஆர்டர் #{order_id} ரத்து செய்யப்பட்டது.", "push": "உங்கள் ஆர்டர் #{order_id} ரத்து செய்யப்பட்டது."},
+        "te_IN": {"title": "ఆర్డర్ రద్దయింది", "message": "మీ ఆర్డర్ #{order_id} రద్దు చేయబడింది.", "push": "మీ ఆర్డర్ #{order_id} రద్దు చేయబడింది."},
+        "ml_IN": {"title": "ഓർഡർ റദ്ദാക്കി", "message": "നിങ്ങളുടെ ഓർഡർ #{order_id} റദ്ദാക്കി.", "push": "നിങ്ങളുടെ ഓർഡർ #{order_id} റദ്ദാക്കി."},
+        "mr_IN": {"title": "ऑर्डर रद्द झाली", "message": "तुमची ऑर्डर #{order_id} रद्द करण्यात आली.", "push": "तुमची ऑर्डर #{order_id} रद्द करण्यात आली."},
+        "bn_IN": {"title": "অর্ডার বাতিল হয়েছে", "message": "আপনার অর্ডার #{order_id} বাতিল করা হয়েছে।", "push": "আপনার অর্ডার #{order_id} বাতিল করা হয়েছে।"},
+    },    
     "ConsultationStarted": {
         "en_IN": {
             "title": "Your doctor is ready",
@@ -4780,17 +4887,32 @@ def respond_to_appointment(doctor_id, appointment_id):
                 doctor_name = info[1]
                 when = f"{info[2]} at {str(info[3])[:5]}"
 
+                 # Find out which language the patient chose
+                cursor.execute(
+                    "SELECT language FROM users WHERE user_id = %s",
+                    (patient_user_id,)
+                )
+                language_row = cursor.fetchone()
+                patient_language = (
+                    language_row[0] if language_row else "en_IN"
+                )
+
+                # The doctor's answer decides which kind of notice this is
                 if decision == "accept":
-                    title = "Appointment accepted"
-                    message = f"{doctor_name} accepted your appointment on {when}."
                     notice_type = "AppointmentAccepted"
                 else:
-                    title = "Appointment not accepted"
-                    message = (
-                        f"{doctor_name} could not accept your appointment on "
-                        f"{when}. Please book another time."
-                    )
                     notice_type = "AppointmentRejected"
+
+                # Get the title and texts in the patient's language.
+                # The date and time are passed separately so each language
+                # can put them in its own word order.
+                title, message, push_text = notif_text(
+                    notice_type,
+                    patient_language,
+                    doctor_name=doctor_name,
+                    date=info[2],
+                    time=str(info[3])[:5]
+                )
 
                 # Save the notice (for the Alerts list in the profile)
                 cursor.execute("""
@@ -4803,17 +4925,17 @@ def respond_to_appointment(doctor_id, appointment_id):
 
                 conn.commit()
 
-                # Send the push notification to the patient's phone(s)
+                # Send the push notification to the patient's phone(s),
+                # in the same language
                 send_push_to_user(
                     patient_user_id,
                     title,
-                    message,
+                    push_text,
                     {
                         "type": notice_type,
                         "appointment_id": str(appointment_id)
                     }
-                )
-
+                )             
         except Exception as notice_error:
             conn.rollback()
             print("Appointment answer notice error:", notice_error)
@@ -5094,8 +5216,7 @@ def send_start_time_alerts():
               AND (a.appointment_date + a.start_time)
                     > CURRENT_TIMESTAMP - (%s * INTERVAL '1 minute')
         """, (START_ALERT_WINDOW_MINUTES,))
-        # TEMPORARY: shows in the terminal every minute that this check runs
-        print("Start-time check ran. Matching appointments:", cursor.rowcount)
+
         for row in cursor.fetchall():
             appointment_id, start_time, patient_name, doctor_user_id = row
 
@@ -5647,8 +5768,27 @@ def update_order_status(order_id):
         # ----- Tell the patient. A problem here must never undo the
         # status change, so it has its own try/except. -----
         try:
-            title = f"Order {new_status}"
-            message = f"Your order #{order_id} {ORDER_STATUS_MESSAGES[new_status]}"
+            # Find out which language the patient chose
+            cursor.execute(
+                "SELECT language FROM users WHERE user_id = %s",
+                (patient_user_id,)
+            )
+            language_row = cursor.fetchone()
+            patient_language = language_row[0] if language_row else "en_IN"
+
+            # Pick the text for this status in the patient's language.
+            # notif_text("OrderConfirmed", ...) etc. The push below uses
+            # the same message, so only title and message are needed here.
+            title, message, _push = notif_text(
+                "Order" + new_status,
+                patient_language,
+                order_id=order_id
+            )
+
+            # A status with no translation: keep the old English text
+            if not title:
+                title = f"Order {new_status}"
+                message = f"Your order #{order_id} {ORDER_STATUS_MESSAGES[new_status]}"            
 
             # Save the notice (for the Alerts list)
             cursor.execute("""
@@ -6633,10 +6773,30 @@ def first_aid_list():
             topics.append({
                 "first_aid_id": row[0],
                 "name": row[1],
+                "english_name": row[1],  # kept in English so the app can pick the icon
                 "category": row[2],
                 "is_priority": row[3] == 'Y',
                 "reviewed": row[4] == 'Y'
             })
+
+        # Use the patient's language for the names, if translations exist.
+        # The app sends it like /api/first-aid?lang=hi_IN
+        lang = request.args.get("lang", "en_IN")
+
+        if lang in SUPPORTED_LANGUAGES and lang != "en_IN":
+            cursor.execute("""
+                SELECT first_aid_id, condition_name
+                FROM first_aid_translations
+                WHERE language = %s
+            """, (lang,))
+
+            # first_aid_id -> translated name
+            translated = {row[0]: row[1] for row in cursor.fetchall()}
+
+            for topic in topics:
+                # A missing translation keeps the English name
+                if topic["first_aid_id"] in translated:
+                    topic["name"] = translated[topic["first_aid_id"]]            
 
         # Important topics first, then the rest, each in alphabetical order
         topics.sort(key=lambda t: (not t["is_priority"], t["name"].lower()))
@@ -6661,10 +6821,107 @@ def first_aid_list():
         if conn:
             conn.close()
 
-
-# ----- The full text of one topic -----
+# ----- The full text of one topic, in the patient's language -----
 @app.route("/api/first-aid/<int:first_aid_id>", methods=["GET"])
 def first_aid_detail(first_aid_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The English text always exists, so start from it
+        cursor.execute("""
+            SELECT
+                first_aid_id,
+                condition_name,
+                symptoms,
+                first_aid_steps,
+                do_not_do,
+                when_to_seek_help,
+                emergency_warning,
+                COALESCE(category, 'More topics'),
+                reviewed
+            FROM first_aid_guidance
+            WHERE first_aid_id = %s
+        """, (first_aid_id,))
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Topic not found"
+            }), 404
+
+        topic = {
+            "first_aid_id": row[0],
+            "name": row[1],
+            "english_name": row[1],  # kept so the app can pick the icon
+            "symptoms": row[2],
+            "steps": row[3],
+            "do_not_do": row[4],
+            "when_to_seek_help": row[5],
+            "emergency_warning": row[6],
+            "category": row[7],
+            "reviewed": row[8] == 'Y'
+        }
+
+        # The app sends the language like /api/first-aid/316?lang=hi_IN
+        lang = request.args.get("lang", "en_IN")
+
+        if lang in SUPPORTED_LANGUAGES and lang != "en_IN":
+            cursor.execute("""
+                SELECT
+                    condition_name,
+                    symptoms,
+                    first_aid_steps,
+                    do_not_do,
+                    when_to_seek_help,
+                    emergency_warning,
+                    reviewed
+                FROM first_aid_translations
+                WHERE first_aid_id = %s AND language = %s
+            """, (first_aid_id, lang))
+
+            translated = cursor.fetchone()
+
+            # No translation yet: the English text above is used as it is
+            if translated:
+                topic["name"] = translated[0]
+                topic["symptoms"] = translated[1] or topic["symptoms"]
+                topic["steps"] = translated[2] or topic["steps"]
+                topic["do_not_do"] = translated[3] or topic["do_not_do"]
+                topic["when_to_seek_help"] = translated[4] or topic["when_to_seek_help"]
+                topic["emergency_warning"] = translated[5] or topic["emergency_warning"]
+
+                # The Draft label depends on the translation's own review
+                topic["reviewed"] = translated[6] == 'Y'
+
+        return jsonify({
+            "status": "success",
+            "topic": topic
+        }), 200
+
+    except Exception as e:
+        print("First Aid Detail Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the topic"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ----- The full text of one topic -----
+@app.route("/api/first-aid-old/<int:first_aid_id>", methods=["GET"])
+def first_aid_detail_old(first_aid_id):
     conn = None
     cursor = None
 
@@ -7412,6 +7669,846 @@ def ensure_approval_column():
 
 # Run it once when the server starts
 ensure_approval_column()
+
+# ------------------------------------------------------------
+# CREATE THE ADMIN ACCOUNT (runs every time the server starts)
+# 1. Makes the admins table if it is missing.
+# 2. If there is no admin yet, creates one from ADMIN_USERNAME and
+#    ADMIN_PASSWORD in the .env file. The password is saved only
+#    as a hash, never as plain text.
+# ------------------------------------------------------------
+def ensure_admin_account():
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The table for admin accounts (skipped if it already exists)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS admins (
+                admin_id       SERIAL PRIMARY KEY,
+                username       VARCHAR(50) UNIQUE NOT NULL,
+                password_hash  TEXT NOT NULL,
+                full_name      VARCHAR(100),
+                is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at     TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """)
+
+        # Only create an admin if there is none yet
+        cursor.execute("SELECT COUNT(*) FROM admins")
+        admin_count = cursor.fetchone()[0]
+
+        username = (os.getenv("ADMIN_USERNAME") or "").strip()
+        password = os.getenv("ADMIN_PASSWORD") or ""
+
+        if admin_count == 0:
+            if username and len(password) >= 10:
+                cursor.execute("""
+                    INSERT INTO admins (username, password_hash, full_name)
+                    VALUES (%s, %s, %s)
+                """, (username, generate_password_hash(password), username))
+                print("Admin account created")
+            else:
+                print(
+                    "No admin yet. Set ADMIN_USERNAME and an "
+                    "ADMIN_PASSWORD of at least 10 characters in .env"
+                )
+
+        conn.commit()
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Admin account setup error:", e)
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# Run it once when the server starts
+ensure_admin_account()
+
+# ============================================================
+# DOCTOR PROFILE AND SPOKEN LANGUAGES
+# The doctor chooses the languages they can speak. The choice is
+# saved in the doctors table (column "languages", names separated
+# by commas) and can be shown to patients later.
+# ============================================================
+
+# The languages a doctor can choose from (shown as buttons in the app)
+DOCTOR_LANGUAGES = [
+    "English", "Hindi", "Kannada", "Tamil", "Telugu", "Malayalam",
+    "Marathi", "Bengali", "Urdu", "Gujarati", "Punjabi", "Odia"
+]
+
+
+# Makes sure the doctors table has the "languages" column.
+# Runs every time the server starts. If the column exists, nothing changes.
+def ensure_languages_column():
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            ALTER TABLE doctors
+            ADD COLUMN IF NOT EXISTS languages TEXT NOT NULL DEFAULT ''
+        """)
+
+        conn.commit()
+        print("Doctors languages column is ready")
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Languages column setup error:", e)
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# Run it once when the server starts
+ensure_languages_column()
+
+
+# Turns the saved text "English,Hindi" into a list ["English", "Hindi"]
+def languages_to_list(text):
+    return [name for name in (text or "").split(",") if name]
+
+
+# ----- Read a doctor's profile (for the doctor's own profile screen) -----
+@app.route("/api/doctors/<int:doctor_id>/profile", methods=["GET"])
+def get_doctor_profile(doctor_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                u.full_name,
+                u.phone,
+                s.spec_name,
+                d.qualification,
+                d.experience_years,
+                d.license_number,
+                d.languages,
+                d.is_available
+            FROM doctors d
+            JOIN users u
+                ON d.user_id = u.user_id
+            JOIN specializations s
+                ON d.specialization_id = s.spec_id
+            WHERE d.doctor_id = %s
+        """, (doctor_id,))
+
+        row = cursor.fetchone()
+
+        if not row:
+            return jsonify({
+                "status": "error",
+                "message": "Doctor not found"
+            }), 404
+
+        return jsonify({
+            "status": "success",
+            "profile": {
+                "doctor_id": doctor_id,
+                "full_name": row[0],
+                "phone": row[1],
+                "specialization": row[2],
+                "qualification": row[3],
+                "experience_years": row[4],
+                "license_number": row[5],
+                "languages": languages_to_list(row[6]),
+                "is_available": row[7]
+            },
+            # The choices the app shows as buttons
+            "all_languages": DOCTOR_LANGUAGES
+        }), 200
+
+    except Exception as e:
+        print("Get Doctor Profile Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the profile"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- Save the languages a doctor can speak -----
+@app.route("/api/doctors/<int:doctor_id>/languages", methods=["PUT"])
+def save_doctor_languages(doctor_id):
+    data = request.get_json(silent=True) or {}
+    languages = data.get("languages")
+
+    if not isinstance(languages, list):
+        return jsonify({
+            "status": "error",
+            "message": "languages must be a list"
+        }), 400
+
+    # Keep only known languages, once each, in the list's order
+    cleaned = [name for name in DOCTOR_LANGUAGES if name in languages]
+
+    if not cleaned:
+        return jsonify({
+            "status": "error",
+            "message": "Please choose at least one language"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE doctors
+            SET languages = %s
+            WHERE doctor_id = %s
+            RETURNING doctor_id
+        """, (",".join(cleaned), doctor_id))
+
+        if not cursor.fetchone():
+            conn.rollback()
+            return jsonify({
+                "status": "error",
+                "message": "Doctor not found"
+            }), 404
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "languages": cleaned
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Save Doctor Languages Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save the languages"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# AMBULANCES AND HOSPITALS (called "responders")
+# They register once, then get a push notification whenever a
+# patient presses SOS. Both kinds are kept in one table, told
+# apart by the "responder_type" column.
+# ============================================================
+
+RESPONDER_TYPES = ["Ambulance", "Hospital"]
+
+
+# Makes sure the two tables exist. Runs every time the server starts.
+# If they already exist, nothing changes.
+def ensure_responder_tables():
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # One row for each ambulance team or hospital
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS responders (
+                responder_id    SERIAL PRIMARY KEY,
+                responder_type  VARCHAR(20) NOT NULL
+                    CHECK (responder_type IN ('Ambulance', 'Hospital')),
+                name            VARCHAR(150) NOT NULL,
+                phone           VARCHAR(15) NOT NULL,
+                contact_person  VARCHAR(100),
+                vehicle_number  VARCHAR(30),
+                address         TEXT,
+                is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+                UNIQUE (responder_type, phone)
+            )
+        """)
+
+        # The phones that receive the alerts (one row for each phone)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS responder_tokens (
+                token         TEXT PRIMARY KEY,
+                responder_id  INTEGER NOT NULL
+                    REFERENCES responders(responder_id) ON DELETE CASCADE,
+                updated_at    TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+        """)
+
+        conn.commit()
+        print("Responder tables are ready")
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Responder tables setup error:", e)
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# Run it once when the server starts
+ensure_responder_tables()
+
+
+# ----- An ambulance team or a hospital registers -----
+@app.route("/api/responders/register", methods=["POST"])
+def register_responder():
+    data = request.get_json(silent=True) or {}
+
+    responder_type = data.get("type")
+    name = (data.get("name") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    contact_person = (data.get("contact_person") or "").strip()
+    vehicle_number = (data.get("vehicle_number") or "").strip()
+    address = (data.get("address") or "").strip()
+
+    # --- Check what the app sent ---
+    if responder_type not in RESPONDER_TYPES:
+        return jsonify({
+            "status": "error",
+            "message": "type must be Ambulance or Hospital"
+        }), 400
+
+    if not name:
+        return jsonify({
+            "status": "error",
+            "message": "Name is required"
+        }), 400
+
+    if len(phone) != 10 or not phone.isdigit():
+        return jsonify({
+            "status": "error",
+            "message": "Please enter a valid 10-digit phone number"
+        }), 400
+
+    if responder_type == "Ambulance" and not vehicle_number:
+        return jsonify({
+            "status": "error",
+            "message": "Ambulance number is required"
+        }), 400
+
+    if responder_type == "Hospital" and not address:
+        return jsonify({
+            "status": "error",
+            "message": "Hospital address is required"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Create the row. If this phone is already registered for this
+        # type, DO NOTHING keeps the old row and returns no new id.
+        cursor.execute("""
+            INSERT INTO responders
+                (responder_type, name, phone, contact_person,
+                 vehicle_number, address)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (responder_type, phone) DO NOTHING
+            RETURNING responder_id
+        """, (
+            responder_type,
+            name,
+            phone,
+            contact_person or None,
+            vehicle_number or None,
+            address or None
+        ))
+
+        row = cursor.fetchone()
+        already_registered = False
+
+        if row is None:
+            # Already registered: give back the existing id
+            already_registered = True
+
+            cursor.execute("""
+                SELECT responder_id
+                FROM responders
+                WHERE responder_type = %s
+                  AND phone = %s
+            """, (responder_type, phone))
+
+            row = cursor.fetchone()
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "responder_id": row[0],
+            "already_registered": already_registered
+        }), 200 if already_registered else 201
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Register Responder Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Registration failed"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- Save the phone of an ambulance or hospital (for the alerts) -----
+@app.route("/api/responders/<int:responder_id>/device-token", methods=["POST"])
+def save_responder_device_token(responder_id):
+    data = request.get_json(silent=True) or {}
+    token = (data.get("token") or "").strip()
+
+    # The token is a long piece of text. Reject empty or silly values.
+    if not token or len(token) > 4096:
+        return jsonify({
+            "status": "error",
+            "message": "A valid token is required"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT 1 FROM responders WHERE responder_id = %s",
+            (responder_id,)
+        )
+
+        if not cursor.fetchone():
+            return jsonify({
+                "status": "error",
+                "message": "Responder not found"
+            }), 404
+
+        # Save the token. If this phone is already in the table,
+        # just update its owner and time (no duplicate rows).
+        cursor.execute("""
+            INSERT INTO responder_tokens (token, responder_id)
+            VALUES (%s, %s)
+            ON CONFLICT (token)
+            DO UPDATE SET
+                responder_id = EXCLUDED.responder_id,
+                updated_at = CURRENT_TIMESTAMP
+        """, (token, responder_id))
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Token saved"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Save Responder Token Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to save the token"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ============================================================
+# SOS ALERTS FOR AMBULANCES AND HOSPITALS
+# When a patient presses SOS, every registered ambulance and
+# hospital phone gets a push notification. The first version
+# alerts all of them (not only the nearest).
+# ============================================================
+
+# Sends one push notification to each phone token in the list.
+# Returns how many phones it reached. It never raises an error.
+def send_push_to_responder_tokens(tokens, title, body, data=None):
+    # Firebase must have started correctly (see the top of this file)
+    if not firebase_ready:
+        print("SOS alert skipped: Firebase is not ready")
+        return 0
+
+    sent = 0
+
+    for token in tokens:
+        try:
+            message = messaging.Message(
+                token=token,
+                # The text shown on the lock screen
+                notification=messaging.Notification(
+                    title=title,
+                    body=body
+                ),
+                # Extra values the app can read when the alert is tapped
+                data=data or {},
+                android=messaging.AndroidConfig(
+                    priority="high",
+                    notification=messaging.AndroidNotification(
+                        channel_id="consultation_alerts",
+                        sound="default"
+                    )
+                )
+            )
+
+            messaging.send(message)
+            sent += 1
+
+        except Exception as send_error:
+            # A token of an uninstalled app stops working. Remove it.
+            if type(send_error).__name__ in (
+                "UnregisteredError", "SenderIdMismatchError"
+            ):
+                conn = None
+                cursor = None
+
+                try:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "DELETE FROM responder_tokens WHERE token = %s",
+                        (token,)
+                    )
+                    conn.commit()
+                    print("Removed an expired responder phone token")
+                except Exception as cleanup_error:
+                    print("Token cleanup error:", cleanup_error)
+                finally:
+                    if cursor:
+                        cursor.close()
+                    if conn:
+                        conn.close()
+            else:
+                print("SOS alert send error:", send_error)
+
+    return sent
+
+
+# Tells every registered ambulance and hospital about a new SOS.
+# It runs in the background, so the patient's SOS is never slowed
+# down, and any problem here can never break the SOS itself.
+def notify_responders_of_sos(sos_id, patient_id):
+    # Short pause so the SOS row is saved before anyone opens the alert
+    time.sleep(1)
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # The patient's name
+        cursor.execute("""
+            SELECT u.full_name
+            FROM patients p
+            JOIN users u
+                ON p.user_id = u.user_id
+            WHERE p.patient_id = %s
+        """, (patient_id,))
+
+        row = cursor.fetchone()
+        patient_name = row[0] if row else "A patient"
+
+        # Every phone of every active ambulance and hospital
+        cursor.execute("""
+            SELECT rt.token
+            FROM responder_tokens rt
+            JOIN responders r
+                ON rt.responder_id = r.responder_id
+            WHERE r.is_active = TRUE
+        """)
+
+        tokens = [r[0] for r in cursor.fetchall()]
+
+        reached = send_push_to_responder_tokens(
+            tokens,
+            "EMERGENCY SOS",
+            f"{patient_name} needs urgent help. Open RuralCare to respond.",
+            {"type": "SosAlert", "sos_id": str(sos_id)}
+        )
+
+        print(f"SOS {sos_id}: alert sent to {reached} of {len(tokens)} phone(s)")
+
+    except Exception as e:
+        print("Notify Responders Error:", e)
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+# ----- The open SOS requests, for an ambulance or hospital -----
+@app.route("/api/responders/<int:responder_id>/sos", methods=["GET"])
+def responder_open_sos(responder_id):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Only a registered, active ambulance or hospital may look
+        cursor.execute("""
+            SELECT 1
+            FROM responders
+            WHERE responder_id = %s
+              AND is_active = TRUE
+        """, (responder_id,))
+
+        if not cursor.fetchone():
+            return jsonify({
+                "status": "error",
+                "message": "Responder not found"
+            }), 404
+
+        # Every request that is not closed yet, newest first
+        cursor.execute("""
+            SELECT
+                s.sos_id,
+                s.request_time,
+                s.status,
+                s.location_lat,
+                s.location_lng,
+                u.full_name,
+                u.phone,
+                p.emergency_contact_name,
+                p.emergency_contact_phone
+            FROM sos_requests s
+            JOIN patients p
+                ON s.patient_id = p.patient_id
+            JOIN users u
+                ON p.user_id = u.user_id
+            WHERE s.status <> 'Closed'
+            ORDER BY s.request_time DESC
+            LIMIT 50
+        """)
+
+        sos_list = []
+
+        for row in cursor.fetchall():
+            sos_list.append({
+                "sos_id": row[0],
+                "request_time": str(row[1])[:16],
+                "status": row[2],
+                "latitude": float(row[3]) if row[3] is not None else None,
+                "longitude": float(row[4]) if row[4] is not None else None,
+                "patient_name": row[5],
+                "patient_phone": row[6],
+                "contact_name": row[7],
+                "contact_phone": row[8]
+            })
+
+        return jsonify({
+            "status": "success",
+            "sos": sos_list
+        }), 200
+
+    except Exception as e:
+        print("Responder Open SOS Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to load the SOS requests"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ----- An ambulance team or a hospital logs in -----
+# Only the phone number is checked here. The app asks for the test OTP,
+# the same way as the patient and doctor logins.
+@app.route("/api/responders/login", methods=["POST"])
+def responder_login():
+    data = request.get_json(silent=True) or {}
+
+    responder_type = data.get("type")
+    phone = (data.get("phone") or "").strip()
+
+    if responder_type not in RESPONDER_TYPES:
+        return jsonify({
+            "status": "error",
+            "message": "type must be Ambulance or Hospital"
+        }), 400
+
+    if len(phone) != 10 or not phone.isdigit():
+        return jsonify({
+            "status": "error",
+            "message": "Please enter a valid 10-digit phone number"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT
+                responder_id,
+                name,
+                contact_person,
+                vehicle_number,
+                address
+            FROM responders
+            WHERE responder_type = %s
+              AND phone = %s
+              AND is_active = TRUE
+        """, (responder_type, phone))
+
+        row = cursor.fetchone()
+
+        if not row:
+            kind = "ambulance team" if responder_type == "Ambulance" else "hospital"
+
+            return jsonify({
+                "status": "error",
+                "message": f"No registered {kind} found with this phone number. Please register first."
+            }), 404
+
+        return jsonify({
+            "status": "success",
+            "responder": {
+                "responder_id": row[0],
+                "name": row[1],
+                "contact_person": row[2],
+                "vehicle_number": row[3],
+                "address": row[4]
+            }
+        }), 200
+
+    except Exception as e:
+        print("Responder Login Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Login failed"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+# ----- Forget the phone of an ambulance or hospital (used at logout) -----
+@app.route("/api/responders/<int:responder_id>/device-token", methods=["DELETE"])
+def delete_responder_device_token(responder_id):
+    data = request.get_json(silent=True) or {}
+    token = (data.get("token") or "").strip()
+
+    if not token:
+        return jsonify({
+            "status": "error",
+            "message": "A token is required"
+        }), 400
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Only this responder's own phone can be removed
+        cursor.execute("""
+            DELETE FROM responder_tokens
+            WHERE token = %s
+              AND responder_id = %s
+        """, (token, responder_id))
+
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Token removed"
+        }), 200
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+
+        print("Delete Responder Token Error:", e)
+
+        return jsonify({
+            "status": "error",
+            "message": "Failed to remove the token"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
 
 if __name__ == "__main__":
     # Start the reminder timer (appointment and follow-up reminders)

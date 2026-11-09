@@ -1,0 +1,12 @@
+# Settings for the app icon (Android only)
+flutter_launcher_icons:
+  android: true
+  ios: false
+  # Your project logo (used for older Android versions)
+  image_path: "assets/logo.png"
+  # Newer Android: the logo sits on a plain colour, a bit smaller,
+  # so the rounded or circle crop never cuts it
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/logo.png"
+  # Empty space around the logo, in percent (raise it if it is still cut)
+  adaptive_icon_foreground_inset: 20

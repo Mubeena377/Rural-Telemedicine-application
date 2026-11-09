@@ -1,0 +1,8 @@
+# Opening screen: green background with the white logo
+flutter_native_splash:
+  color: "#138A1E"
+  image: assets/splash_logo_white.png
+  # Android 12 and newer has its own rules, so it gets its own settings
+  android_12:
+    color: "#138A1E"
+    image: assets/splash_logo_white.png

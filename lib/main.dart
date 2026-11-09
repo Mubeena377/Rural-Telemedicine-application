@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -23,11 +24,15 @@ import 'choose_language.dart';
 import 'alerts_screen.dart';
 import 'medicine_reminder_screen.dart';
 import 'first_aid_screen.dart';
+import 'responder_login_screen.dart';
+import 'doctor_profile_details_screen.dart';
 import 'app_language.dart';
 export 'app_language.dart';
 import 'admin_screens.dart';
 import 'doctor_consultations_screen.dart';
 import 'help_support_screen.dart';
+import 'responder_push.dart';
+import 'responder_sos_screen.dart';
 
 final ValueNotifier<String> ambulanceStatus =
     ValueNotifier<String>('Available');
@@ -2954,7 +2959,7 @@ Future<void> main() async {
       builder: (context, language, child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'Rural Telemedicine',
+          title: 'RuralCare',
           theme: ThemeData(
             primarySwatch: Colors.green,
             scaffoldBackgroundColor: Colors.white,
@@ -3018,6 +3023,37 @@ void initState() {
       return; // Stop here, the code below is for patients
     }
 
+    // An ambulance team is saved on this phone: open its dashboard directly
+    if (prefs.getBool('ambulanceRegistered') ?? false) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AmbulanceDashboardScreen(),
+        ),
+      );
+      return;
+    }
+
+    // A hospital is saved on this phone: open its dashboard directly
+    if (prefs.getBool('hospitalRegistered') ?? false) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HospitalDashboardScreen(),
+        ),
+      );
+      return;
+    }
+     // A hospital is saved on this phone: open its dashboard directly
+    if (prefs.getBool('hospitalRegistered') ?? false) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HospitalDashboardScreen(),
+        ),
+      );
+      return;
+    }   
     final isRegistered =
         prefs.getBool('isRegistered') ?? false;
 
@@ -3040,50 +3076,52 @@ void initState() {
 }
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
+        return Scaffold(
+      // Green background, same as Android's opening screen
+      backgroundColor: const Color(0xFF138A1E),
 
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
 
-            // LOGO
+            // LOGO (white version)
             Image.asset(
-              'assets/logo.png',
+              'assets/logo_white.png',
               height: 150,
             ),
 
             const SizedBox(height: 25),
 
             const Text(
-              'Rural Telemedicine',
+              'RuralCare',
               style: TextStyle(
                 fontSize: 25,
                 fontWeight: FontWeight.bold,
-                color: Colors.green,
+                color: Colors.white,
               ),
             ),
 
             const SizedBox(height: 8),
 
-            Text(
+            const Text(
               'Healthcare at your fingertips',
               style: TextStyle(
                 fontSize: 15,
-                color: Colors.grey,
+                color: Colors.white70,
               ),
             ),
 
             const SizedBox(height: 35),
 
             const CircularProgressIndicator(
-              color: Colors.green,
+              color: Colors.white,
             ),
           ],
         ),
       ),
     );
+    
   }
 }
 class LanguageSelectionScreen extends StatefulWidget {
@@ -3743,7 +3781,7 @@ await prefs.setString(
       // AMBULANCE
       // ====================================================
 
-      if (value == 'ambulance') {
+            if (value == 'ambulance') {
         final prefs = await SharedPreferences.getInstance();
 
         final ambulanceRegistered =
@@ -3751,23 +3789,20 @@ await prefs.setString(
 
         if (!mounted) return;
 
-        if (ambulanceRegistered) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  const AmbulanceDashboardScreen(),
-            ),
-          );
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  const AmbulanceRegistrationScreen(),
-            ),
-          );
-        }
+        // Logged in: open the dashboard. Not logged in: open the login screen.
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ambulanceRegistered
+                ? const AmbulanceDashboardScreen()
+                : ResponderLoginScreen(
+                    type: 'Ambulance',
+                    dashboardBuilder: () => const AmbulanceDashboardScreen(),
+                    registrationBuilder: () =>
+                        const AmbulanceRegistrationScreen(),
+                  ),
+          ),
+        );
       }
 
       // ====================================================
@@ -3787,17 +3822,33 @@ await prefs.setString(
       // ====================================================
       // HOSPITAL
       // ====================================================
+    
+              else if (value == 'hospital') {
+        final prefs = await SharedPreferences.getInstance();
 
-      else if (value == 'hospital') {
+        final hospitalRegistered =
+            prefs.getBool('hospitalRegistered') ?? false;
+
+        if (!mounted) return;
+
+        // Logged in: open the dashboard. Not logged in: open the login screen.
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                const HospitalRegistrationScreen(),
+            builder: (context) => hospitalRegistered
+                ? const HospitalDashboardScreen()
+                : ResponderLoginScreen(
+                    type: 'Hospital',
+                    dashboardBuilder: () => const HospitalDashboardScreen(),
+                    registrationBuilder: () =>
+                        const HospitalRegistrationScreen(),
+                  ),
           ),
         );
       }
-            // ====================================================
+      
+      
+      // ====================================================
       // ADMIN
       // ====================================================
 
@@ -3854,13 +3905,12 @@ await prefs.setString(
               color: Colors.green,
             ),
             SizedBox(width: 10),
-            Text('Hospital Registration'),
-            ],
-          ),
+              Text('Hospital Registration'),
+          ],
         ),
-      ],
-    ),
-          // 🛡️ ADMIN
+      ),
+
+      // 🛡️ ADMIN
       PopupMenuItem<String>(
         value: 'admin',
         child: Row(
@@ -3874,8 +3924,12 @@ await prefs.setString(
           ],
         ),
       ),
-  ],
-),
+    ],   // closes the menu list
+  ),     // closes the three-dot button
+],       // closes the top bar buttons
+),       // closes the top bar                
+
+
       body: SafeArea(
 
         child: SingleChildScrollView(
@@ -7438,7 +7492,7 @@ Future<void> loadDoctors() async {
           // ====================================================
 
           SizedBox(
-            height: 150,
+            height: 215,
 
             child: ListView.builder(
               scrollDirection:
@@ -8150,6 +8204,19 @@ Future<void> loadDoctors() async {
               fontWeight: FontWeight.w600,
             ),
           ),
+                    // The languages the doctor can speak (hidden if none were chosen)
+          if (((doctor['languages'] as List?) ?? []).isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Speaks: ${(doctor['languages'] as List).join(', ')}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Colors.grey,
+              ),
+            ),
+          ],
         ],
       ),
     ),
@@ -11122,69 +11189,105 @@ class SOSLocationScreen extends StatefulWidget {
   State<SOSLocationScreen> createState() => _SOSLocationScreenState();
 }
 
-class _SOSLocationScreenState extends State<SOSLocationScreen> {
+  class _SOSLocationScreenState extends State<SOSLocationScreen> {
   int remainingSeconds = 10;
   Timer? countdownTimer;
 
-@override
-void initState() {
-  super.initState();
+  // Plays our emergency beep file (assets/sounds/emergency_beep.wav)
+  final AudioPlayer _beepPlayer = AudioPlayer();
 
-  activateSOSRequest();
+  // Plays the beep once. Called every second during the last 5 seconds.
+  Future<void> _playEmergencyBeep() async {
+    try {
+      // Stop any beep still playing, so each second starts a fresh beep
+      await _beepPlayer.stop();
 
-  countdownTimer = Timer.periodic(
-    const Duration(seconds: 1),
-    (timer) {
-      if (remainingSeconds > 0) {
-        setState(() {
-          remainingSeconds--;
-        });
-      } else {
-        timer.cancel();
-
-        if (!mounted) return;
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const LocatingHospitalsScreen(),
-          ),
-        );
-      }
-    },
-  );
-}
-Future<void> activateSOSRequest() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  final patientId = prefs.getInt('patientId');
-  print('APPOINTMENTS - Patient ID: $patientId');
-  if (patientId == null) {
-    debugPrint('SOS Error: Patient ID not found');
-    return;
+      // The path is relative to the assets folder
+      await _beepPlayer.play(
+        AssetSource('sounds/emergency_beep.wav'),
+        volume: 1.0,
+      );
+    } catch (e) {
+      // If the sound fails, the countdown still works
+      debugPrint('Could not play emergency beep: $e');
+    }
   }
 
-  final result = await ApiService.activateSOS(
-    patientId: patientId,
-    latitude: widget.latitude,
-    longitude: widget.longitude,
-  );
+  @override
+  void initState() {
+    super.initState();
 
-   if (result['success'] == true) {
-  debugPrint('SOS created successfully');
-  debugPrint('SOS ID: ${result['sos_id']}');
+    // Tell the server the SOS has started
+    activateSOSRequest();
 
-  await prefs.setInt(
-    'sosId',
-    result['sos_id'],
-  );
- }else {
-    debugPrint('SOS failed: ${result['message']}');
+    // Count down once per second
+    countdownTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (timer) {
+        if (remainingSeconds > 0) {
+          setState(() {
+            remainingSeconds--;
+          });
+
+          // Beep during the last 7 seconds (7, 6, 5, 4, 3, 2, 1)
+          if (remainingSeconds >= 1 && remainingSeconds <= 7) {
+            _playEmergencyBeep();
+          }
+        } else {
+          timer.cancel();
+
+          if (!mounted) return;
+
+          // Countdown finished: continue to the hospital search screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const LocatingHospitalsScreen(),
+            ),
+          );
+        }
+      },
+    );
   }
-}
+
+  Future<void> activateSOSRequest() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final patientId = prefs.getInt('patientId');
+    print('APPOINTMENTS - Patient ID: $patientId');
+    if (patientId == null) {
+      debugPrint('SOS Error: Patient ID not found');
+      return;
+    }
+
+    final result = await ApiService.activateSOS(
+      patientId: patientId,
+      latitude: widget.latitude,
+      longitude: widget.longitude,
+    );
+
+    if (result['success'] == true) {
+      debugPrint('SOS created successfully');
+      debugPrint('SOS ID: ${result['sos_id']}');
+
+      await prefs.setInt(
+        'sosId',
+        result['sos_id'],
+      );
+    } else {
+      debugPrint('SOS failed: ${result['message']}');
+    }
+  }
+
   @override
   void dispose() {
     countdownTimer?.cancel();
+
+    // Stop the beep and free the player when the screen closes
+    // (for example when the patient taps Cancel SOS)
+    _beepPlayer.stop();
+    _beepPlayer.dispose();
+
     super.dispose();
   }
 
@@ -11196,7 +11299,7 @@ Future<void> activateSOSRequest() async {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(
+          icon: const Icon(
             Icons.arrow_back_ios_new_rounded,
             color: Colors.black87,
           ),
@@ -11205,7 +11308,7 @@ Future<void> activateSOSRequest() async {
           },
         ),
         title: Text(
-         tr('Emergency SOS',selectedLanguage),
+          tr('Emergency SOS', selectedLanguage),
           style: const TextStyle(
             color: Colors.black87,
             fontWeight: FontWeight.bold,
@@ -11235,7 +11338,7 @@ Future<void> activateSOSRequest() async {
               ),
               child: Column(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.location_on_rounded,
                     color: Colors.red,
                     size: 42,
@@ -11246,7 +11349,7 @@ Future<void> activateSOSRequest() async {
                   Text(
                     tr('Sending Your Live Location...', selectedLanguage),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 21,
                       fontWeight: FontWeight.bold,
                       color: Colors.red,
@@ -11258,7 +11361,7 @@ Future<void> activateSOSRequest() async {
                   Text(
                     tr('Emergency dispatch center is receiving your location.', selectedLanguage),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       color: Colors.black54,
                     ),
@@ -11309,7 +11412,7 @@ Future<void> activateSOSRequest() async {
                       children: [
                         Text(
                           tr('Capturing Coordinates', selectedLanguage),
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
@@ -11319,7 +11422,7 @@ Future<void> activateSOSRequest() async {
 
                         Text(
                           tr('Lat: ${widget.latitude.toStringAsFixed(6)}°\n'
-                          'Lon: ${widget.longitude.toStringAsFixed(6)}°',selectedLanguage),
+                          'Lon: ${widget.longitude.toStringAsFixed(6)}°', selectedLanguage),
                           style: const TextStyle(
                             fontSize: 13,
                             color: Colors.black54,
@@ -11350,7 +11453,7 @@ Future<void> activateSOSRequest() async {
                 children: [
                   Text(
                     tr('PATIENT HEALTH CARD', selectedLanguage),
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: Colors.teal,
@@ -11359,9 +11462,9 @@ Future<void> activateSOSRequest() async {
 
                   const SizedBox(height: 15),
 
-                   Text(
+                  Text(
                     tr('Patient medical information', selectedLanguage),
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
                     ),
@@ -11371,7 +11474,7 @@ Future<void> activateSOSRequest() async {
 
                   Text(
                     tr('Registered health records will be shared with emergency medical responders.', selectedLanguage),
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13,
                       color: Colors.black54,
                     ),
@@ -11395,39 +11498,39 @@ Future<void> activateSOSRequest() async {
                   ),
                 ),
                 onPressed: () async {
-  final prefs = await SharedPreferences.getInstance();
+                  final prefs = await SharedPreferences.getInstance();
 
-  final sosId = prefs.getInt('sosId');
+                  final sosId = prefs.getInt('sosId');
 
-  if (sosId == null) {
-    debugPrint('Cancel SOS Error: SOS ID not found');
-    return;
-  }
+                  if (sosId == null) {
+                    debugPrint('Cancel SOS Error: SOS ID not found');
+                    return;
+                  }
 
-  final result = await ApiService.cancelSOS(
-    sosId: sosId,
-  );
+                  final result = await ApiService.cancelSOS(
+                    sosId: sosId,
+                  );
 
-  if (result['success'] == true) {
-    debugPrint('SOS cancelled successfully');
+                  if (result['success'] == true) {
+                    debugPrint('SOS cancelled successfully');
 
-    if (!mounted) return;
+                    if (!mounted) return;
 
-    Navigator.pop(context);
-  } else {
-    debugPrint('Cancel SOS failed: ${result['message']}');
+                    Navigator.pop(context);
+                  } else {
+                    debugPrint('Cancel SOS failed: ${result['message']}');
 
-    if (!mounted) return;
+                    if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result['message'] ?? 'Unable to cancel SOS',
-        ),
-      ),
-    );
-  }
-},
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result['message'] ?? 'Unable to cancel SOS',
+                        ),
+                      ),
+                    );
+                  }
+                },
                 child: Text(
                   tr('Cancel SOS ($remainingSeconds s)', selectedLanguage),
                   style: const TextStyle(
@@ -11440,10 +11543,10 @@ Future<void> activateSOSRequest() async {
 
             const SizedBox(height: 15),
 
-             Text(
+            Text(
               tr('Your location is being securely shared for emergency assistance.', selectedLanguage),
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
                 color: Colors.grey,
               ),
@@ -11454,6 +11557,7 @@ Future<void> activateSOSRequest() async {
     );
   }
 }
+
 class LocatingHospitalsScreen extends StatefulWidget {
   const LocatingHospitalsScreen({super.key});
 
@@ -11467,55 +11571,57 @@ class _LocatingHospitalsScreenState
   Timer? locatingTimer;
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  updateSOSToAssigned();
-}
-Future<void> updateSOSToAssigned() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  final sosId = prefs.getInt('sosId');
-
-  if (sosId == null) {
-    debugPrint('SOS ID not found');
-    return;
+    updateSOSToAssigned();
   }
 
-  // Keep the hospital-search screen visible for 5 seconds
-  await Future.delayed(
-    const Duration(seconds: 5),
-  );
+  Future<void> updateSOSToAssigned() async {
+    final prefs = await SharedPreferences.getInstance();
 
-  if (!mounted) return;
+    final sosId = prefs.getInt('sosId');
 
-  final result = await ApiService.updateSOSStatus(
-    sosId: sosId,
-    status: 'Assigned',
-  );
+    if (sosId == null) {
+      debugPrint('SOS ID not found');
+      return;
+    }
 
-  if (result['success'] == true) {
-    debugPrint('SOS status changed to Assigned');
+    // Keep the hospital-search screen visible for 5 seconds
+    await Future.delayed(
+      const Duration(seconds: 5),
+    );
 
     if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            const EscalatingEmergencyScreen(),
-      ),
+    final result = await ApiService.updateSOSStatus(
+      sosId: sosId,
+      status: 'Assigned',
     );
-  } else {
-    debugPrint(
-      'Failed to update SOS status: ${result['message']}',
-    );
+
+    if (result['success'] == true) {
+      debugPrint('SOS status changed to Assigned');
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const EscalatingEmergencyScreen(),
+        ),
+      );
+    } else {
+      debugPrint(
+        'Failed to update SOS status: ${result['message']}',
+      );
+    }
   }
-}
+
   @override
   void dispose() {
     super.dispose();
-  }
+  } 
 
   @override
   Widget build(BuildContext context) {
@@ -14333,52 +14439,78 @@ class _AmbulanceRegistrationScreenState
     }
   }
 
-  Future<void> registerAmbulance() async {
-  if (teamNameController.text.trim().isEmpty ||
-      phoneController.text.length != 10 ||
-      !otpVerified ||
-      ambulanceNumberController.text.trim().isEmpty ||
-      driverNameController.text.trim().isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please complete all required fields.'),
+    Future<void> registerAmbulance() async {
+    // 1. Check that every field is filled in
+    if (teamNameController.text.trim().isEmpty ||
+        phoneController.text.length != 10 ||
+        !otpVerified ||
+        ambulanceNumberController.text.trim().isEmpty ||
+        driverNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please complete all required fields.'),
+        ),
+      );
+      return;
+    }
+
+    // 2. Register on the server, so SOS alerts can reach this ambulance
+    final result = await ApiService.registerResponder(
+      type: 'Ambulance',
+      name: teamNameController.text.trim(),
+      phone: phoneController.text.trim(),
+      contactPerson: driverNameController.text.trim(),
+      vehicleNumber: ambulanceNumberController.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    if (result['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            (result['message'] ?? 'Registration failed').toString(),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 3. Save the details on the phone (as before) and the server's id
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('ambulanceRegistered', true);
+    await prefs.setInt(
+      'responderId',
+      int.parse(result['responder_id'].toString()),
+    );
+    await prefs.setString('responderType', 'Ambulance');
+    await prefs.setString(
+      'ambulanceTeamName',
+      teamNameController.text.trim(),
+    );
+    await prefs.setString(
+      'ambulancePhone',
+      phoneController.text.trim(),
+    );
+    await prefs.setString(
+      'ambulanceNumber',
+      ambulanceNumberController.text.trim(),
+    );
+    await prefs.setString(
+      'ambulanceDriverName',
+      driverNameController.text.trim(),
+    );
+
+    if (!mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AmbulanceRegistrationSuccessScreen(),
       ),
     );
-    return;
   }
-
-  final prefs = await SharedPreferences.getInstance();
-
-  // Save ambulance registration details
-  await prefs.setBool('ambulanceRegistered', true);
-
-  await prefs.setString(
-    'ambulanceTeamName',
-    teamNameController.text.trim(),
-  );
-
-  await prefs.setString(
-    'ambulancePhone',
-    phoneController.text.trim(),
-  );
-
-  await prefs.setString(
-    'ambulanceNumber',
-    ambulanceNumberController.text.trim(),
-  );
-
-  await prefs.setString(
-    'ambulanceDriverName',
-    driverNameController.text.trim(),
-  );
-
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const AmbulanceRegistrationSuccessScreen(),
-    ),
-  );
-}
 
   Widget inputField({
     required String label,
@@ -14777,6 +14909,7 @@ class AmbulanceDashboardScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            const ResponderPhoneRegistrar(),         
             const SizedBox(height: 10),
 
             ElevatedButton.icon(
@@ -14864,7 +14997,9 @@ class AmbulanceDashboardScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                builder: (context) =>
-               const NewEmergencyRequestsScreen(),
+               const ResponderSosListScreen(
+                 title: 'New Emergency Requests',
+               ),
            ),
           );
         },
@@ -15002,398 +15137,7 @@ class AmbulanceDashboardScreen extends StatelessWidget {
     );
   }
 }
-// ============================================================
-// NEW EMERGENCY REQUESTS SCREEN
-// ============================================================
 
-class NewEmergencyRequestsScreen extends StatelessWidget {
-  const NewEmergencyRequestsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
-
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-
-        title: const Text(
-          'Emergency Requests',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-
-        centerTitle: true,
-      ),
-
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-
-            // ==================================================
-            // HEADER
-            // ==================================================
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.red.shade100,
-                ),
-              ),
-
-              child: Row(
-                children: [
-
-                  Container(
-                    width: 55,
-                    height: 55,
-
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade100,
-                      shape: BoxShape.circle,
-                    ),
-
-                    child: Icon(
-                      Icons.emergency_rounded,
-                      color: Colors.red.shade700,
-                      size: 30,
-                    ),
-                  ),
-
-                  const SizedBox(width: 15),
-
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-
-                      children: [
-
-                        Text(
-                          'Incoming Emergency',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFB71C1C),
-                          ),
-                        ),
-
-                        SizedBox(height: 5),
-
-                        Text(
-                          'A patient has requested emergency assistance.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.black54,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            const Text(
-              'New Requests',
-              style: TextStyle(
-                fontSize: 21,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF202938),
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            const Text(
-              'Review emergency requests and respond quickly.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.black54,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ==================================================
-            // EMERGENCY REQUEST CARD
-            // ==================================================
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-
-                border: Border.all(
-                  color: Colors.red.shade200,
-                  width: 1.5,
-                ),
-
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-
-                children: [
-
-                  // Request status
-                  Row(
-                    children: [
-
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius:
-                              BorderRadius.circular(20),
-                        ),
-
-                        child: Text(
-                          'URGENT',
-                          style: TextStyle(
-                            color: Colors.red.shade700,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-
-                      const Spacer(),
-
-                      const Text(
-                        'Just now',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  // Patient
-                  Row(
-                    children: [
-
-                      Container(
-                        width: 48,
-                        height: 48,
-
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          shape: BoxShape.circle,
-                        ),
-
-                        child: Icon(
-                          Icons.person_rounded,
-                          color: Colors.blue.shade700,
-                          size: 27,
-                        ),
-                      ),
-
-                      const SizedBox(width: 13),
-
-                      const Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-
-                        children: [
-
-                          Text(
-                            'Emergency Patient',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-
-                          SizedBox(height: 3),
-
-                          Text(
-                            'Emergency SOS Request',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const Divider(),
-
-                  const SizedBox(height: 15),
-
-                  // Emergency information
-                  _requestInfo(
-                    Icons.warning_rounded,
-                    Colors.red,
-                    'Emergency',
-                    'Immediate medical assistance required',
-                  ),
-
-                  const SizedBox(height: 13),
-
-                  _requestInfo(
-                    Icons.location_on_rounded,
-                    Colors.teal,
-                    'Patient Location',
-                    'Location received from patient',
-                  ),
-
-                  const SizedBox(height: 13),
-
-                  _requestInfo(
-                    Icons.route_rounded,
-                    Colors.orange,
-                    'Distance',
-                    'Nearby emergency request',
-                  ),
-
-                  const SizedBox(height: 22),
-
-                  // View details button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const AmbulanceEmergencyDetailsScreen(),
-                          ),
-                        );
-                      },
-
-                      icon: const Icon(
-                        Icons.visibility_rounded,
-                      ),
-
-                      label: const Text(
-                        'View Emergency Details',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // No more requests
-            Center(
-              child: Text(
-                'More emergency requests will appear here.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Widget _requestInfo(
-    IconData icon,
-    Color color,
-    String title,
-    String value,
-  ) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-
-      children: [
-
-        Icon(
-          icon,
-          color: color,
-          size: 21,
-        ),
-
-        const SizedBox(width: 12),
-
-        Expanded(
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-
-            children: [
-
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
-
-              const SizedBox(height: 2),
-
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 
 // ============================================================
@@ -17483,19 +17227,31 @@ class _AmbulanceProfileScreenState
                   final prefs =
                       await SharedPreferences
                           .getInstance();
-
                   await prefs.setBool(
                     'ambulanceRegistered',
                     false,
                   );
 
+                  // Stop SOS alerts on this phone
+                  await unregisterResponderPhone();
+
+                  // Forget the server account on this phone
+                  await prefs.remove('responderId');
+                  await prefs.remove('responderType');
+
                   if (!context.mounted) return;
 
+                  // Go to the login screen
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          const AmbulanceRegistrationScreen(),
+                      builder: (context) => ResponderLoginScreen(
+                        type: 'Ambulance',
+                        dashboardBuilder: () =>
+                            const AmbulanceDashboardScreen(),
+                        registrationBuilder: () =>
+                            const AmbulanceRegistrationScreen(),
+                      ),
                     ),
                     (route) => false,
                   );
@@ -18105,89 +17861,6 @@ const SizedBox(height: 18),
   }
 }
 
-
-// ============================================================
-// DOCTOR REGISTRATION SUCCESS
-// ============================================================
-
-class DoctorRegistrationSuccessScreen extends StatelessWidget {
-  const DoctorRegistrationSuccessScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Registration Successful'),
-        backgroundColor: const Color(0xFF3F6FA8),
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(25),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircleAvatar(
-                radius: 45,
-                backgroundColor: Color(0xFFE8F1FA),
-                child: Icon(
-                  Icons.check_circle,
-                  size: 60,
-                  color: Colors.green,
-                ),
-              ),
-
-              const SizedBox(height: 25),
-
-              const Text(
-                'Registration Successful!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 25,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              const Text(
-                'Your doctor registration has been completed successfully.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey,
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                           const DoctorLoginScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'Continue to Doctor Dashboard',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class DoctorKycScreen extends StatefulWidget {
   final int doctorId;
@@ -19082,7 +18755,9 @@ class DoctorDashboardScreen extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const DoctorProfileScreen(),
+             builder: (context) => DoctorProfileDetailsScreen(
+              doctorId: doctorId,
+            ),           
           ),
         );
       },
@@ -19717,23 +19392,6 @@ class _DoctorAvailabilityScreenState
     );
   }
 
-  // (old version, no longer used)
-  void oldSaveAvailability() {
-    if (isAvailable && selectedDays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one working day.'),
-        ),
-      );
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Doctor availability saved successfully.'),
-      ),
-    );
-  }
 
   Widget sectionTitle(String title) {
     return Padding(
@@ -20022,286 +19680,8 @@ class _DoctorAvailabilityScreenState
     );
   }
 }
-class DoctorProfileScreen extends StatelessWidget {
-  const DoctorProfileScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
 
-      appBar: AppBar(
-        title: const Text('Doctor Profile'),
-        backgroundColor: const Color(0xFF3F6FA8),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-
-            // Profile image
-            const CircleAvatar(
-              radius: 48,
-              backgroundColor: Color(0xFFEAF2FA),
-              child: Icon(
-                Icons.medical_services_outlined,
-                size: 50,
-                color: Color(0xFF3F6FA8),
-              ),
-            ),
-
-            const SizedBox(height: 14),
-
-            const Text(
-              'Dr. Doctor Name',
-              style: TextStyle(
-                fontSize: 23,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF26384A),
-              ),
-            ),
-
-            const SizedBox(height: 4),
-
-            const Text(
-              'Doctor Profile',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // KYC Status
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF7E6),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: const Color(0xFFFFD98A),
-                ),
-              ),
-              child: const Row(
-                children: [
-                  Icon(
-                    Icons.verified_outlined,
-                    color: Colors.orange,
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'KYC Status: Pending Verification',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Personal & Professional Information
-            profileSection(
-              title: 'Professional Information',
-              children: const [
-                profileItem(
-                  icon: Icons.badge_outlined,
-                  title: 'Medical Registration Number',
-                  value: 'Not available',
-                ),
-
-                profileItem(
-                  icon: Icons.school_outlined,
-                  title: 'Qualification',
-                  value: 'Not available',
-                ),
-
-                profileItem(
-                  icon: Icons.medical_information_outlined,
-                  title: 'Specialization',
-                  value: 'Not available',
-                ),
-
-                profileItem(
-                  icon: Icons.work_outline,
-                  title: 'Years of Experience',
-                  value: 'Not available',
-                ),
-
-                profileItem(
-                  icon: Icons.local_hospital_outlined,
-                  title: 'Hospital / Clinic',
-                  value: 'Not available',
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 18),
-
-            profileSection(
-              title: 'Contact Information',
-              children: const [
-                profileItem(
-                  icon: Icons.phone_outlined,
-                  title: 'Phone Number',
-                  value: 'Not available',
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 18),
-
-            // Availability
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: const Color(0xFFDCE5EE),
-                ),
-              ),
-              child: const Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Color(0xFFE8F5E9),
-                    child: Icon(
-                      Icons.circle,
-                      color: Colors.green,
-                      size: 14,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Availability',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF26384A),
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Available for consultation',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-Widget profileSection({
-  required String title,
-  required List<Widget> children,
-}) {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(
-        color: const Color(0xFFDCE5EE),
-      ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF26384A),
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...children,
-      ],
-    ),
-  );
-}
-
-class profileItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-
-  const profileItem({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            color: const Color(0xFF3F6FA8),
-            size: 22,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF26384A),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 // ============================================================
 // DOCTOR APPOINTMENTS
 // ============================================================
@@ -24048,7 +23428,8 @@ class _HospitalRegistrationScreenState
     }
   }
 
-  Future<void> registerHospital() async {
+    Future<void> registerHospital() async {
+    // 1. Check that every field is filled in
     if (hospitalNameController.text.trim().isEmpty ||
         contactPersonController.text.trim().isEmpty ||
         addressController.text.trim().isEmpty ||
@@ -24070,9 +23451,37 @@ class _HospitalRegistrationScreenState
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    // 2. Register on the server, so SOS alerts can reach this hospital
+    final result = await ApiService.registerResponder(
+      type: 'Hospital',
+      name: hospitalNameController.text.trim(),
+      phone: phoneController.text.trim(),
+      contactPerson: contactPersonController.text.trim(),
+      address: addressController.text.trim(),
+    );
 
+    if (!mounted) return;
+
+    if (result['success'] != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            (result['message'] ?? 'Registration failed').toString(),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 3. Save on the phone (as before) and the server's id
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hospitalRegistered', true);
+    await prefs.setInt(
+      'responderId',
+      int.parse(result['responder_id'].toString()),
+    );
+    await prefs.setString('responderType', 'Hospital');
 
     if (!mounted) return;
 
@@ -24431,7 +23840,7 @@ class HospitalDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+            appBar: AppBar(
         backgroundColor: Colors.green,
         foregroundColor: Colors.white,
         title: const Text(
@@ -24441,6 +23850,65 @@ class HospitalDashboardScreen extends StatelessWidget {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: () async {
+              // Ask first
+              final shouldLogout = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Logout'),
+                  content: const Text(
+                    'Are you sure you want to logout from the hospital account?',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Logout'),
+                    ),
+                  ],
+                ),
+              );
+
+
+              if (shouldLogout != true) return;
+
+              // Forget the hospital on this phone
+                // Stop SOS alerts on this phone
+              await unregisterResponderPhone();
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('hospitalRegistered', false);
+              await prefs.remove('responderId');
+              await prefs.remove('responderType');
+
+              if (!context.mounted) return;
+
+              // Go to the login screen
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ResponderLoginScreen(
+                    type: 'Hospital',
+                    dashboardBuilder: () => const HospitalDashboardScreen(),
+                    registrationBuilder: () =>
+                        const HospitalRegistrationScreen(),
+                  ),
+                ),
+                (route) => false,
+              );
+            },
+          ),
+        ],
       ),
 
       body: SingleChildScrollView(
@@ -24448,6 +23916,7 @@ class HospitalDashboardScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const ResponderPhoneRegistrar(),          
             const Text(
               'Hospital Dashboard',
               style: TextStyle(
@@ -24473,14 +23942,15 @@ class HospitalDashboardScreen extends StatelessWidget {
               subtitle: 'View incoming SOS emergency requests.',
               color: Colors.red,
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Emergency Requests will be connected to the backend.',
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ResponderSosListScreen(
+                      title: 'Emergency Requests',
                     ),
                   ),
                 );
-              },
+              },              
             ),
 
             dashboardCard(

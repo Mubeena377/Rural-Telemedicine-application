@@ -178,60 +178,7 @@ class _DoctorCreatePrescriptionScreenState
     });
   }
 
-    Future<void> oldAddDigitalSignature() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Digital Signature'),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.draw_outlined,
-                size: 55,
-                color: Color(0xFF3F6FA8),
-              ),
-              SizedBox(height: 15),
-              Text(
-                'Signature capture will allow the doctor to sign the prescription digitally.',
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 12),
-              Text(
-                'For the current frontend POC, the signature is represented as a verified digital signature.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context, false);
-              },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context, true);
-              },
-              child: const Text('Add Signature'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result == true) {
-      setState(() {
-        signatureAdded = true;
-      });
-    }
-  }
+  
 
     // Loads the doctor's saved signature from the server.
   // If one exists, it is used automatically.

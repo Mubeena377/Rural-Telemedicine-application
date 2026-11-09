@@ -264,7 +264,13 @@ class _FirstAidScreenState extends State<FirstAidScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(firstAidIcon(name), size: 40, color: color),
+            // The icon is chosen from the English name, so it still works
+            // when the shown name is translated
+            Icon(
+              firstAidIcon((topic['english_name'] ?? name).toString()),
+              size: 40,
+              color: color,
+            ),
             const SizedBox(height: 6),
             Text(
               name,
@@ -292,7 +298,11 @@ class _FirstAidScreenState extends State<FirstAidScreen> {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: color.withOpacity(0.12),
-        child: Icon(firstAidIcon(name), color: color),
+        // Same here: pick the icon from the English name
+        child: Icon(
+          firstAidIcon((topic['english_name'] ?? name).toString()),
+          color: color,
+        ),
       ),
       title: Text(name),
       trailing: const Icon(Icons.arrow_forward_ios, size: 14),
@@ -575,7 +585,12 @@ class _FirstAidDetailScreenState extends State<FirstAidDetailScreen> {
             CircleAvatar(
               radius: 32,
               backgroundColor: color.withOpacity(0.12),
-              child: Icon(firstAidIcon(name), size: 36, color: color),
+              // Same here: pick the icon from the English name
+              child: Icon(
+                firstAidIcon((data['english_name'] ?? name).toString()),
+                size: 36,
+                color: color,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(

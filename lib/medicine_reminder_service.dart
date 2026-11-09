@@ -97,9 +97,9 @@ class MedicineReminderService {
   static const String _storageKey = 'medicine_reminders';
   static const String _counterKey = 'medicine_reminder_counter';
 
-  // The notification "channel". Android remembers a channel's vibration
-  // when it is first created, so a changed pattern needs a new name.
-  static const String channelId = 'medicine_reminders_v1';
+  // A NEW channel name on purpose: Android never changes the sound of a
+  // channel it already has, so the alarm sound needs a fresh channel.
+  static const String channelId = 'medicine_alarm_v2';
 
   // The most reminders and days we allow, so ids never clash
   static const int maxTimesPerDay = 4;
@@ -124,13 +124,22 @@ class MedicineReminderService {
     return NotificationDetails(
       android: AndroidNotificationDetails(
         channelId,
-        'Medicine reminders',
+        'Medicine alarm',
         channelDescription: 'Reminds you to take your medicine',
         importance: Importance.max,
         priority: Priority.high,
+
+        // Play our own 10-second alarm file (res/raw/medicine_alarm.mp3).
+        // Write the name without the .mp3
         playSound: true,
-        enableVibration: true,
-        vibrationPattern: vibrationPattern,
+        sound: const RawResourceAndroidNotificationSound('medicine_alarm'),
+
+        // Use the phone's ALARM volume, like a real alarm clock
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+
+        // No vibration, sound only
+        enableVibration: false,
+
         category: AndroidNotificationCategory.alarm,
       ),
     );
@@ -144,19 +153,24 @@ class MedicineReminderService {
     tzdata.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
 
-    // Create the channel with the long vibration
+        // The Android part of the notification plugin (needed for channels)
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
 
+    // Remove the old channel (it still vibrates) so only the alarm remains
+    await android?.deleteNotificationChannel('medicine_reminders_v1');
+
+    // Create the alarm channel: own sound, no vibration
     await android?.createNotificationChannel(
-      AndroidNotificationChannel(
+      const AndroidNotificationChannel(
         channelId,
-        'Medicine reminders',
+        'Medicine alarm',
         description: 'Reminds you to take your medicine',
         importance: Importance.max,
         playSound: true,
-        enableVibration: true,
-        vibrationPattern: vibrationPattern,
+        sound: RawResourceAndroidNotificationSound('medicine_alarm'),
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        enableVibration: false,
       ),
     );
 
