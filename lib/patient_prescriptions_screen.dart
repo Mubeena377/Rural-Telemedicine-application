@@ -3,9 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'prescription_pdf.dart';
 import 'order_medicine_screen.dart';
+import 'patient_prescriptions_text.dart'; // tx() shows text in the chosen language
+
 // ============================================================
 // PATIENT PRESCRIPTIONS SCREEN
 // Shows the prescriptions doctors have issued to the patient.
+// Every fixed sentence goes through tx(), so it follows the language the
+// patient chose. What the doctor wrote (medicine names, doses, notes,
+// instructions) is shown as written.
 // ============================================================
 
 class PatientPrescriptionsScreen extends StatefulWidget {
@@ -60,7 +65,7 @@ class _PatientPrescriptionsScreenState
         setState(() {
           isLoading = false;
           errorMessage =
-              'Patient information not found. Please log in again.';
+              tx('Patient information not found. Please log in again.');
         });
         return;
       }
@@ -86,6 +91,7 @@ class _PatientPrescriptionsScreenState
 
   // Builds the short text line for one medicine, e.g.
   // "200mg • twice daily • 3 days"
+  // (the dose and the frequency are what the doctor wrote)
   String medicineSummary(Map<String, dynamic> medicine) {
     final parts = <String>[];
 
@@ -96,7 +102,8 @@ class _PatientPrescriptionsScreenState
       parts.add(medicine['frequency'].toString());
     }
     if (medicine['duration_days'] != null) {
-      parts.add('${medicine['duration_days']} days');
+      // The number first, then the word for "days" in the chosen language
+      parts.add('${medicine['duration_days']} ${tx('days')}');
     }
 
     return parts.join(' • ');
@@ -121,7 +128,7 @@ class _PatientPrescriptionsScreenState
           children: [
             // Doctor name and specialization
             Text(
-              prescription['doctor_name']?.toString() ?? 'Doctor',
+              prescription['doctor_name']?.toString() ?? tx('Doctor'),
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
@@ -138,7 +145,7 @@ class _PatientPrescriptionsScreenState
 
             // Date of the prescription
             Text(
-              'Date: ${prescription['prescription_date']}',
+              '${tx('Date')}: ${prescription['prescription_date']}',
               style: const TextStyle(fontSize: 13),
             ),
 
@@ -146,16 +153,17 @@ class _PatientPrescriptionsScreenState
             if ((prescription['diagnosis'] ?? '').toString().isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
-                'Diagnosis: ${prescription['diagnosis']}',
+                '${tx('Diagnosis')}: ${prescription['diagnosis']}',
                 style: const TextStyle(fontSize: 13),
               ),
             ],
 
             const Divider(height: 24),
 
-            const Text(
-              'Medicines',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            Text(
+              tx('Medicines'),
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 
@@ -209,14 +217,14 @@ class _PatientPrescriptionsScreenState
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
-                'Notes: $notes',
+                '${tx('Notes')}: $notes',
                 style: const TextStyle(fontSize: 12),
               ),
             ],
 
             const SizedBox(height: 12),
 
-                        // Button that opens the order screen for this prescription
+            // Button that opens the order screen for this prescription
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -232,7 +240,7 @@ class _PatientPrescriptionsScreenState
                   );
                 },
                 icon: const Icon(Icons.local_pharmacy),
-                label: const Text('Order Medicines'),
+                label: Text(tx('Order Medicines')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3F6FA8),
                   foregroundColor: Colors.white,
@@ -254,17 +262,16 @@ class _PatientPrescriptionsScreenState
                     // If something goes wrong, tell the patient
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Could not create the PDF.'),
+                      SnackBar(
+                        content: Text(tx('Could not create the PDF.')),
                       ),
                     );
                   }
                 },
                 icon: const Icon(Icons.download_outlined),
-                label: const Text('Share / Save PDF'),
+                label: Text(tx('Share / Save PDF')),
               ),
             ),
-            
           ],
         ),
       ),
@@ -295,7 +302,7 @@ class _PatientPrescriptionsScreenState
               ElevatedButton.icon(
                 onPressed: loadPrescriptions,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                label: Text(tx('Retry')),
               ),
             ],
           ),
@@ -305,15 +312,16 @@ class _PatientPrescriptionsScreenState
 
     // 3. Loaded, but there are no prescriptions yet
     if (prescriptions.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.medication_outlined, size: 60, color: Colors.grey),
-            SizedBox(height: 14),
+            const Icon(Icons.medication_outlined,
+                size: 60, color: Colors.grey),
+            const SizedBox(height: 14),
             Text(
-              'No prescriptions yet',
-              style: TextStyle(
+              tx('No prescriptions yet'),
+              style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
                 color: Colors.grey,
@@ -325,7 +333,7 @@ class _PatientPrescriptionsScreenState
     }
 
     // 4. Show the list (pull down to refresh)
-      // In order mode the list gets one extra item at the top:
+    // In order mode the list gets one extra item at the top:
     // a short message telling the patient what to do
     final extra = widget.orderMode ? 1 : 0;
 
@@ -344,9 +352,9 @@ class _PatientPrescriptionsScreenState
                 color: const Color(0xFFEAF2FA),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Choose a prescription, then tap "Order Medicines" on it.',
-                style: TextStyle(
+              child: Text(
+                tx('Choose a prescription, then tap "Order Medicines" on it.'),
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF26384A),
@@ -368,9 +376,9 @@ class _PatientPrescriptionsScreenState
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
-                // Shows a different title when opened for ordering
+        // Shows a different title when opened for ordering
         title: Text(
-          widget.orderMode ? 'Order Medicines' : 'My Prescriptions',
+          widget.orderMode ? tx('Order Medicines') : tx('My Prescriptions'),
         ),
         backgroundColor: const Color(0xFF3F6FA8),
         foregroundColor: Colors.white,

@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'email_support_screen.dart';
 import 'call_support_screen.dart';
 import 'report_problem_screen.dart';
+import 'help_support_text.dart'; // tx() shows text in the chosen language
+
+// ============================================================
+// HELP AND SUPPORT SCREEN
+// Every fixed sentence goes through tx(), so it follows the language
+// the patient chose. Layout and buttons are unchanged.
+// ============================================================
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
@@ -12,9 +19,9 @@ class HelpSupportScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFF7FAFC),
 
       appBar: AppBar(
-        title: const Text(
-          'Help & Support',
-          style: TextStyle(
+        title: Text(
+          tx('Help & Support'),
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 21,
           ),
@@ -59,9 +66,9 @@ class HelpSupportScreen extends StatelessWidget {
 
                   const SizedBox(height: 14),
 
-                  const Text(
-                    'How can we help you?',
-                    style: TextStyle(
+                  Text(
+                    tx('How can we help you?'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -70,9 +77,9 @@ class HelpSupportScreen extends StatelessWidget {
 
                   const SizedBox(height: 6),
 
-                  const Text(
-                    'We are here to help you use Rural Telemedicine.',
-                    style: TextStyle(
+                  Text(
+                    tx('We are here to help you use Rural Telemedicine.'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
                     ),
@@ -83,9 +90,9 @@ class HelpSupportScreen extends StatelessWidget {
 
             const SizedBox(height: 26),
 
-            const Text(
-              'Frequently Asked Questions',
-              style: TextStyle(
+            Text(
+              tx('Frequently Asked Questions'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF263238),
@@ -95,30 +102,30 @@ class HelpSupportScreen extends StatelessWidget {
             const SizedBox(height: 12),
 
             _faqTile(
-              'How can I book an appointment?',
-              'Open the appointment section, choose an available doctor and select your preferred time.',
+              tx('How can I book an appointment?'),
+              tx('Open the appointment section, choose an available doctor and select your preferred time.'),
             ),
 
             _faqTile(
-              'How do I join a video consultation?',
-              'Open your scheduled appointment and tap the video consultation option.',
+              tx('How do I join a video consultation?'),
+              tx('Open your scheduled appointment and tap the video consultation option.'),
             ),
 
             _faqTile(
-              'Where can I view my prescriptions?',
-              'Open the Prescriptions section in your patient account.',
+              tx('Where can I view my prescriptions?'),
+              tx('Open the Prescriptions section in your patient account.'),
             ),
 
             _faqTile(
-              'How can I use Emergency SOS?',
-              'Open the Emergency section and follow the instructions to request emergency assistance.',
+              tx('How can I use Emergency SOS?'),
+              tx('Open the Emergency section and follow the instructions to request emergency assistance.'),
             ),
 
             const SizedBox(height: 26),
 
-            const Text(
-              'Contact Support',
-              style: TextStyle(
+            Text(
+              tx('Contact Support'),
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF263238),
@@ -128,8 +135,8 @@ class HelpSupportScreen extends StatelessWidget {
             const SizedBox(height: 12),
             _supportTile(
               icon: Icons.email_outlined,
-              title: 'Email Support',
-              subtitle: 'Get help through email',
+              title: tx('Email Support'),
+              subtitle: tx('Get help through email'),
               onTap: () {
                 Navigator.push(
                   context,
@@ -141,8 +148,8 @@ class HelpSupportScreen extends StatelessWidget {
             ),
             _supportTile(
               icon: Icons.phone_outlined,
-              title: 'Call Support',
-              subtitle: 'Speak with our support team',
+              title: tx('Call Support'),
+              subtitle: tx('Speak with our support team'),
               onTap: () {
                 Navigator.push(
                   context,
@@ -151,12 +158,12 @@ class HelpSupportScreen extends StatelessWidget {
                   ),
                 );
               },
-            ),            
+            ),
 
-              _supportTile(
+            _supportTile(
               icon: Icons.report_problem_outlined,
-              title: 'Report a Problem',
-              subtitle: 'Tell us about an issue with the app',
+              title: tx('Report a Problem'),
+              subtitle: tx('Tell us about an issue with the app'),
               onTap: () {
                 Navigator.push(
                   context,
@@ -172,6 +179,7 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
 
+  // One question that opens to show its answer
   static Widget _faqTile(String question, String answer) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -208,6 +216,7 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
 
+  // One row in the Contact Support list
   static Widget _supportTile({
     required IconData icon,
     required String title,

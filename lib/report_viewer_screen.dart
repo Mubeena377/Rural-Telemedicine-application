@@ -1,6 +1,11 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import 'app_text.dart'; // gives us the tt() translation helper
+import 'report_viewer_texts.dart'; // the 8-language texts for this screen
+
+// Short helper: translates one English text for this screen
+String _t(String text) => tt(reportViewerTexts, text);
 
 // ============================================================
 // REPORT VIEWER SCREEN
@@ -65,6 +70,7 @@ class _ReportViewerScreenState extends State<ReportViewerScreen> {
       if (!mounted) return;
       setState(() {
         isLoading = false;
+        // Server messages stay in English
         errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
     }
@@ -86,7 +92,8 @@ class _ReportViewerScreenState extends State<ReportViewerScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                errorMessage ?? 'Could not open the report.',
+                // A server message stays English; our own message is translated
+                errorMessage ?? _t('Could not open the report.'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.red),
               ),
@@ -94,7 +101,7 @@ class _ReportViewerScreenState extends State<ReportViewerScreen> {
               ElevatedButton.icon(
                 onPressed: load,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                label: Text(_t('Retry')),
               ),
             ],
           ),
@@ -125,10 +132,11 @@ class _ReportViewerScreenState extends State<ReportViewerScreen> {
           fit: BoxFit.contain,
           // If the file is not a real picture, show a message
           errorBuilder: (context, error, stackTrace) {
-            return const Padding(
-              padding: EdgeInsets.all(24),
+            // (no "const" here because the text is translated)
+            return Padding(
+              padding: const EdgeInsets.all(24),
               child: Text(
-                'This file could not be shown as a picture.',
+                _t('This file could not be shown as a picture.'),
                 textAlign: TextAlign.center,
               ),
             );
@@ -143,6 +151,7 @@ class _ReportViewerScreenState extends State<ReportViewerScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
+        // The report's own title is typed by the patient/doctor, so it stays as is
         title: Text(widget.title),
         backgroundColor: const Color(0xFF3F6FA8),
         foregroundColor: Colors.white,

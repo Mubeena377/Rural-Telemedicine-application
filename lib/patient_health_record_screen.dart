@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'patient_prescriptions_screen.dart';
 import 'patient_reports_screen.dart';
+import 'patient_health_record_text.dart'; // tx() shows text in the chosen language
 
 // ============================================================
 // PATIENT HEALTH RECORD SCREEN
@@ -11,6 +12,8 @@ import 'patient_reports_screen.dart';
 //  - allergies, conditions, etc. that the patient can add or remove
 //  - the consultation history (tap a card to see the details)
 //  - a shortcut to the patient's prescriptions
+// Every fixed sentence goes through tx(), so it follows the language the
+// patient chose. What the patient or the doctor typed is shown as written.
 // ============================================================
 
 class PatientHealthRecordScreen extends StatefulWidget {
@@ -43,7 +46,8 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
   String? errorMessage;
 
   // The kinds of record a patient can add, each with its own
-  // icon and colour. "type" is the exact word the server expects.
+  // icon and colour. "type" is the exact word the server expects, so it
+  // stays in English; it is translated only when it is shown.
   final List<Map<String, dynamic>> recordTypes = [
     {
       'type': 'Allergy',
@@ -111,7 +115,7 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
         setState(() {
           isLoading = false;
           errorMessage =
-              'Patient information not found. Please log in again.';
+              tx('Patient information not found. Please log in again.');
         });
         return;
       }
@@ -173,9 +177,9 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Add to your health record',
-                    style: TextStyle(
+                  Text(
+                    tx('Add to your health record'),
+                    style: const TextStyle(
                       fontSize: 19,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF26384A),
@@ -197,7 +201,8 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
                           size: 20,
                           color: selectedType == type ? Colors.white : color,
                         ),
-                        label: Text(type),
+                        // Shown in the chosen language; "type" stays English
+                        label: Text(tx(type)),
                         selected: selectedType == type,
                         selectedColor: color,
                         labelStyle: TextStyle(
@@ -222,7 +227,7 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
                     controller: descriptionController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Example: Allergic to penicillin',
+                      hintText: tx('Example: Allergic to penicillin'),
                       filled: true,
                       fillColor: const Color(0xFFF7FAFC),
                       border: OutlineInputBorder(
@@ -247,7 +252,7 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
 
                               // Nothing was written
                               if (description.isEmpty) {
-                                showMessage('Please write a short note.');
+                                showMessage(tx('Please write a short note.'));
                                 return;
                               }
 
@@ -271,19 +276,20 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
                                   saving = false;
                                 });
                                 showMessage(
-                                  result['message'] ?? 'Failed to add.',
+                                  (result['message'] ?? tx('Failed to add.'))
+                                      .toString(),
                                 );
                                 return;
                               }
 
                               // Saved: close the form and reload the list
                               Navigator.pop(sheetContext);
-                              showMessage('Added to your health record.');
+                              showMessage(tx('Added to your health record.'));
                               loadRecord();
                             },
                       icon: const Icon(Icons.add),
                       label: Text(
-                        saving ? 'Saving...' : 'Add',
+                        saving ? tx('Saving...') : tx('Add'),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -317,16 +323,16 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Remove this entry?'),
+          title: Text(tx('Remove this entry?')),
           content: Text((record['description'] ?? '').toString()),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
+              child: Text(tx('Cancel')),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Remove'),
+              child: Text(tx('Remove')),
             ),
           ],
         );
@@ -343,11 +349,11 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
     if (!mounted) return;
 
     if (result['success'] != true) {
-      showMessage(result['message'] ?? 'Failed to remove.');
+      showMessage((result['message'] ?? tx('Failed to remove.')).toString());
       return;
     }
 
-    showMessage('Removed.');
+    showMessage(tx('Removed.'));
     loadRecord(); // Reload the list
   }
 
@@ -370,22 +376,23 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
       ),
       child: Row(
         children: [
-          const Expanded(
+          // No "const" here any more, because the text is translated
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Your Health Record',
-                  style: TextStyle(
+                  tx('Your Health Record'),
+                  style: const TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
-                  'Everything about your health, in one place.',
-                  style: TextStyle(fontSize: 13, color: Colors.white70),
+                  tx('Everything about your health, in one place.'),
+                  style: const TextStyle(fontSize: 13, color: Colors.white70),
                 ),
               ],
             ),
@@ -486,14 +493,16 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
           backgroundColor: color.withOpacity(0.12),
           child: Icon(info['icon'] as IconData, color: color, size: 28),
         ),
+        // The kind of record, shown in the chosen language
         title: Text(
-          (record['record_type'] ?? '').toString(),
+          tx((record['record_type'] ?? '').toString()),
           style: TextStyle(fontWeight: FontWeight.bold, color: color),
         ),
+        // What the patient wrote stays as written
         subtitle: Text((record['description'] ?? '').toString()),
         trailing: IconButton(
           icon: const Icon(Icons.delete_outline, color: Colors.red),
-          tooltip: 'Remove',
+          tooltip: tx('Remove'),
           onPressed: () => deleteRecord(record),
         ),
       ),
@@ -554,7 +563,7 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
             ),
           ),
           title: Text(
-            diagnosis.isEmpty ? 'Consultation' : diagnosis,
+            diagnosis.isEmpty ? tx('Consultation') : diagnosis,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           subtitle: Text(
@@ -562,13 +571,13 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
             style: const TextStyle(fontSize: 12),
           ),
           children: [
-            detailRow(Icons.person_outline, 'Doctor',
+            detailRow(Icons.person_outline, tx('Doctor'),
                 '${item['doctor_name'] ?? ''} (${item['specialization'] ?? ''})'),
-            detailRow(Icons.chat_bubble_outline, 'Complaint',
+            detailRow(Icons.chat_bubble_outline, tx('Complaint'),
                 item['chief_complaint']),
-            detailRow(Icons.notes, 'Doctor notes', item['notes']),
-            detailRow(Icons.lightbulb_outline, 'Advice', item['advice']),
-            detailRow(Icons.event_available, 'Follow-up date',
+            detailRow(Icons.notes, tx('Doctor notes'), item['notes']),
+            detailRow(Icons.lightbulb_outline, tx('Advice'), item['advice']),
+            detailRow(Icons.event_available, tx('Follow-up date'),
                 item['follow_up_date']),
           ],
         ),
@@ -618,26 +627,26 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
                 Icons.medical_services,
                 Colors.teal,
                 '${consultations.length}',
-                'Consultations',
+                tx('Consultations'),
               ),
               const SizedBox(width: 12),
               summaryTile(
                 Icons.health_and_safety_outlined,
                 Colors.blue,
                 '${records.length}',
-                'Saved notes',
+                tx('Saved notes'),
               ),
             ],
           ),
 
           // ----- Allergies, conditions and more -----
           sectionHeader(
-            'Allergies, conditions & more',
+            tx('Allergies, conditions & more'),
             Icons.health_and_safety_outlined,
             trailing: ElevatedButton.icon(
               onPressed: showAddRecordSheet,
               icon: const Icon(Icons.add, size: 20),
-              label: const Text('Add'),
+              label: Text(tx('Add')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF3F6FA8),
                 foregroundColor: Colors.white,
@@ -648,24 +657,24 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
           if (records.isEmpty)
             emptyMessage(
               Icons.add_circle_outline,
-              'Nothing added yet. Tap "Add" to write down an allergy, a condition or a vaccine.',
+              tx('Nothing added yet. Tap "Add" to write down an allergy, a condition or a vaccine.'),
             )
           else
             ...records.map(recordCard),
 
           // ----- Consultation history -----
-          sectionHeader('Consultation history', Icons.history),
+          sectionHeader(tx('Consultation history'), Icons.history),
 
           if (consultations.isEmpty)
             emptyMessage(
               Icons.medical_services_outlined,
-              'No consultations yet. They will appear here after you see a doctor.',
+              tx('No consultations yet. They will appear here after you see a doctor.'),
             )
           else
             ...consultations.map(consultationCard),
 
           // ----- Shortcut to reports (lab results and scans) -----
-          sectionHeader('Reports', Icons.folder_open),
+          sectionHeader(tx('Reports'), Icons.folder_open),
 
           Card(
             elevation: 2,
@@ -697,21 +706,22 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
                       ),
                     ),
                     const SizedBox(width: 14),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'My Reports',
-                            style: TextStyle(
+                            tx('My Reports'),
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 3),
+                          const SizedBox(height: 3),
                           Text(
-                            'Upload and keep your test results and scans',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            tx('Upload and keep your test results and scans'),
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -724,7 +734,7 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
           ),
 
           // ----- Shortcut to prescriptions -----
-          sectionHeader('Prescriptions', Icons.medication),
+          sectionHeader(tx('Prescriptions'), Icons.medication),
 
           Card(
             elevation: 2,
@@ -756,21 +766,22 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
                       ),
                     ),
                     const SizedBox(width: 14),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'My Prescriptions',
-                            style: TextStyle(
+                            tx('My Prescriptions'),
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 3),
+                          const SizedBox(height: 3),
                           Text(
-                            'View, share or save your prescriptions',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            tx('View, share or save your prescriptions'),
+                            style: const TextStyle(
+                                fontSize: 12, color: Colors.grey),
                           ),
                         ],
                       ),
@@ -812,7 +823,7 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
               ElevatedButton.icon(
                 onPressed: loadRecord,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                label: Text(tx('Retry')),
               ),
             ],
           ),
@@ -832,11 +843,11 @@ class _PatientHealthRecordScreenState extends State<PatientHealthRecordScreen> {
       appBar: widget.embedded
           ? null
           : AppBar(
-              title: const Text('My Health Records'),
+              title: Text(tx('My Health Records')),
               backgroundColor: const Color(0xFF3F6FA8),
               foregroundColor: Colors.white,
               elevation: 0,
-            ),      
+            ),
       body: buildBody(),
     );
   }

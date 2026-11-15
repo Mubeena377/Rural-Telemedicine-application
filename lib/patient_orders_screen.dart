@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import 'app_text.dart'; // gives us the tt() translation helper
+import 'patient_orders_texts.dart'; // the 8-language texts for this screen
+
+// Short helper: translates one English text for this screen
+String _t(String text) => tt(patientOrdersTexts, text);
 
 // ============================================================
 // PATIENT ORDERS SCREEN
@@ -33,7 +38,9 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
   // Holds an error message if loading fails
   String? errorMessage;
 
-  // The four steps of a delivery, in order, with an icon for each
+  // The four steps of a delivery, in order.
+  // These stay in English because they are compared with the status
+  // sent by the server. They are translated only when shown on screen.
   final List<String> stepNames = const [
     'Placed',
     'Confirmed',
@@ -71,8 +78,9 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
         if (!mounted) return;
         setState(() {
           isLoading = false;
+          // Translated message (made on the phone, not by the server)
           errorMessage =
-              'Patient information not found. Please log in again.';
+              _t('Patient information not found. Please log in again.');
         });
         return;
       }
@@ -90,12 +98,13 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
       if (!mounted) return;
       setState(() {
         isLoading = false;
+        // Server messages stay in English
         errorMessage = e.toString().replaceFirst('Exception: ', '');
       });
     }
   }
 
-  // A colour for each order status
+  // A colour for each order status (uses the English status from the server)
   Color statusColor(String status) {
     switch (status) {
       case 'Confirmed':
@@ -113,7 +122,7 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
 
   // Friendly text for the payment method codes
   String paymentLabel(String code) {
-    if (code == 'COD') return 'Cash on delivery';
+    if (code == 'COD') return _t('Cash on delivery');
     return code;
   }
 
@@ -133,14 +142,15 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
           color: Colors.red.shade50,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Row(
+        // (no "const" here because the text is translated)
+        child: Row(
           children: [
-            Icon(Icons.cancel_outlined, color: Colors.red),
-            SizedBox(width: 8),
+            const Icon(Icons.cancel_outlined, color: Colors.red),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'This order was cancelled.',
-                style: TextStyle(color: Colors.red),
+                _t('This order was cancelled.'),
+                style: const TextStyle(color: Colors.red),
               ),
             ),
           ],
@@ -185,7 +195,7 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    stepNames[i],
+                    _t(stepNames[i]), // translated step name
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11,
@@ -226,7 +236,9 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
             child: Icon(Icons.local_pharmacy, color: statusColor(status)),
           ),
           title: Text(
-            'Order #${order['order_id']}',
+            // "Order #5" in the chosen language
+            _t('Order #{number}')
+                .replaceAll('{number}', order['order_id'].toString()),
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           subtitle: Padding(
@@ -242,7 +254,7 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    status,
+                    _t(status), // translated status name
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -266,6 +278,7 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
             const Divider(),
 
             // The medicines in this order
+            // (medicine names come from the server, so they stay as they are)
             ...items.map((item) {
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -294,11 +307,14 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
               children: [
                 const Icon(Icons.payments_outlined, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  total > 0
-                      ? 'Total: ₹${total.toStringAsFixed(2)}'
-                      : 'Price will be confirmed by the pharmacy',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                Expanded(
+                  child: Text(
+                    total > 0
+                        ? _t('Total: ₹{amount}')
+                            .replaceAll('{amount}', total.toStringAsFixed(2))
+                        : _t('Price will be confirmed by the pharmacy'),
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ),
@@ -318,7 +334,7 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
 
             const SizedBox(height: 6),
 
-            // Delivery address
+            // Delivery address (typed by the patient, so it stays as it is)
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -386,7 +402,7 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
               ElevatedButton.icon(
                 onPressed: loadOrders,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                label: Text(_t('Retry')),
               ),
             ],
           ),
@@ -409,8 +425,8 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
             ? Icons.local_shipping_outlined
             : Icons.shopping_bag_outlined,
         widget.trackMode
-            ? 'No orders on their way right now.'
-            : 'You have not placed any orders yet.',
+            ? _t('No orders on their way right now.')
+            : _t('You have not placed any orders yet.'),
       );
     }
 
@@ -433,7 +449,7 @@ class _PatientOrdersScreenState extends State<PatientOrdersScreen> {
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
         title: Text(
-          widget.trackMode ? 'Track Your Order' : 'Your Orders',
+          widget.trackMode ? _t('Track Your Order') : _t('Your Orders'),
         ),
         backgroundColor: const Color(0xFF3F6FA8),
         foregroundColor: Colors.white,

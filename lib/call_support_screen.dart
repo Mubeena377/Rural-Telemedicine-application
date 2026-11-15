@@ -1,5 +1,11 @@
-
 import 'package:flutter/material.dart';
+
+import 'app_text.dart';
+import 'call_support_texts.dart';
+
+// Finds a text in the chosen language (English if it is missing).
+// It starts with _ so it belongs only to this file.
+String _t(String text) => tt(callSupportTexts, text);
 
 class CallSupportScreen extends StatelessWidget {
   const CallSupportScreen({super.key});
@@ -9,9 +15,9 @@ class CallSupportScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
-        title: const Text(
-          'Call Support',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          _t('Call Support'),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.teal,
@@ -30,9 +36,9 @@ class CallSupportScreen extends StatelessWidget {
 
             const SizedBox(height: 18),
 
-            const Text(
-              'Talk to our Support Team',
-              style: TextStyle(
+            Text(
+              _t('Talk to our Support Team'),
+              style: const TextStyle(
                 fontSize: 23,
                 fontWeight: FontWeight.bold,
               ),
@@ -40,11 +46,11 @@ class CallSupportScreen extends StatelessWidget {
 
             const SizedBox(height: 10),
 
-            const Text(
-              'Need assistance with appointments, video consultations, '
-              'prescriptions or other app-related issues? '
-              'We are here to help.',
-              style: TextStyle(
+            Text(
+              _t(
+                'Need assistance with appointments, video consultations, prescriptions or other app-related issues? We are here to help.',
+              ),
+              style: const TextStyle(
                 fontSize: 15,
                 height: 1.5,
                 color: Colors.black54,
@@ -71,9 +77,9 @@ class CallSupportScreen extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  const Text(
-                    'Support Phone Number',
-                    style: TextStyle(
+                  Text(
+                    _t('Support Phone Number'),
+                    style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
                     ),
@@ -82,7 +88,7 @@ class CallSupportScreen extends StatelessWidget {
                   const SizedBox(height: 8),
 
                   Text(
-                    'Coming Soon',
+                    _t('Coming Soon'),
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.teal.shade700,
@@ -96,9 +102,10 @@ class CallSupportScreen extends StatelessWidget {
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton.icon(
+                      // Switched off until a real support number exists
                       onPressed: null,
                       icon: const Icon(Icons.call),
-                      label: const Text('Call Now'),
+                      label: Text(_t('Call Now')),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.teal,
                         foregroundColor: Colors.white,
@@ -111,11 +118,11 @@ class CallSupportScreen extends StatelessWidget {
 
             const SizedBox(height: 18),
 
-            const Center(
+            Center(
               child: Text(
-                'Our phone support service will be available soon.',
+                _t('Our phone support service will be available soon.'),
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
                   color: Colors.black54,
                 ),

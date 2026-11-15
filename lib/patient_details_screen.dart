@@ -1,8 +1,12 @@
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
+import 'app_text.dart'; // gives us the tt() translation helper
+import 'patient_details_texts.dart'; // the 8-language texts for this screen
+
+// Short helper: translates one English text for this screen
+String _t(String text) => tt(patientDetailsTexts, text);
 
 class PatientDetailsScreen extends StatefulWidget {
   const PatientDetailsScreen({super.key});
@@ -45,9 +49,11 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
       final patientId = prefs.getInt('patientId');
 
       if (patientId == null) {
+        if (!mounted) return;
         setState(() {
+          // Translated message (made on the phone, not by the server)
           errorMessage =
-              'Patient ID not found. Please register or sign in again.';
+              _t('Patient ID not found. Please register or sign in again.');
           isLoading = false;
         });
         return;
@@ -68,8 +74,10 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
         });
       } else {
         setState(() {
+          // A message from the server stays English;
+          // our own fallback message is translated.
           errorMessage =
-              result['message'] ?? 'Unable to load patient details.';
+              result['message'] ?? _t('Unable to load patient details.');
           isLoading = false;
         });
       }
@@ -77,17 +85,19 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
       if (!mounted) return;
 
       setState(() {
-        errorMessage = 'Something went wrong: $e';
+        errorMessage =
+            _t('Something went wrong: {error}').replaceAll('{error}', '$e');
         isLoading = false;
       });
     }
   }
 
   // Shows a label and its corresponding database value.
+  // "label" is already translated by the caller.
   Widget buildDetail(String label, dynamic value, IconData icon) {
     final displayValue =
         value == null || value.toString().trim().isEmpty
-            ? 'Not provided'
+            ? _t('Not provided')
             : value.toString();
 
     return Container(
@@ -132,10 +142,17 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // The gender is saved in English (Male / Female / Other).
+    // Here we only translate what is SHOWN. If the text is empty, keep it empty.
+    final genderRaw = patient?['gender'];
+    final genderShown = (genderRaw == null || genderRaw.toString().trim().isEmpty)
+        ? null
+        : _t(genderRaw.toString());
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F8FB),
       appBar: AppBar(
-        title: const Text('My Details'),
+        title: Text(_t('My Details')),
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
         actions: [
@@ -143,7 +160,7 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
           IconButton(
             onPressed: isLoading ? null : loadPatientDetails,
             icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh details',
+            tooltip: _t('Refresh details'),
           ),
         ],
       ),
@@ -171,15 +188,15 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                           ElevatedButton.icon(
                             onPressed: loadPatientDetails,
                             icon: const Icon(Icons.refresh),
-                            label: const Text('Try again'),
+                            label: Text(_t('Try again')),
                           ),
                         ],
                       ),
                     ),
                   )
                 : patient == null
-                    ? const Center(
-                        child: Text('No patient details available.'),
+                    ? Center(
+                        child: Text(_t('No patient details available.')),
                       )
                     : RefreshIndicator(
                         onRefresh: loadPatientDetails,
@@ -212,8 +229,8 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          patient!['full_name']?.toString()
-                                                  ?? 'Patient',
+                                          patient!['full_name']?.toString() ??
+                                              _t('Patient'),
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 20,
@@ -222,7 +239,11 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                                         ),
                                         const SizedBox(height: 5),
                                         Text(
-                                          'Patient ID: ${patient!['patient_id']}',
+                                          // "Patient ID: 4" in the chosen language
+                                          _t('Patient ID: {id}').replaceAll(
+                                            '{id}',
+                                            '${patient!['patient_id']}',
+                                          ),
                                           style: const TextStyle(
                                             color: Colors.white70,
                                           ),
@@ -234,9 +255,9 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                               ),
                             ),
 
-                            const Text(
-                              'Personal Information',
-                              style: TextStyle(
+                            Text(
+                              _t('Personal Information'),
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -244,35 +265,35 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                             const SizedBox(height: 14),
 
                             buildDetail(
-                              'Full Name',
+                              _t('Full Name'),
                               patient!['full_name'],
                               Icons.person_outline,
                             ),
                             buildDetail(
-                              'Date of Birth',
+                              _t('Date of Birth'),
                               patient!['date_of_birth'],
                               Icons.cake_outlined,
                             ),
                             buildDetail(
-                              'Gender',
-                              patient!['gender'],
+                              _t('Gender'),
+                              genderShown, // translated value
                               Icons.wc_outlined,
                             ),
                             buildDetail(
-                              'Phone Number',
+                              _t('Phone Number'),
                               patient!['phone'],
                               Icons.phone_outlined,
                             ),
                             buildDetail(
-                              'Address',
+                              _t('Address'),
                               patient!['address'],
                               Icons.home_outlined,
                             ),
 
                             const SizedBox(height: 20),
-                            const Text(
-                              'Emergency Contact',
-                              style: TextStyle(
+                            Text(
+                              _t('Emergency Contact'),
+                              style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -280,12 +301,12 @@ class _PatientDetailsScreenState extends State<PatientDetailsScreen> {
                             const SizedBox(height: 14),
 
                             buildDetail(
-                              'Contact Name',
+                              _t('Contact Name'),
                               patient!['emergency_contact_name'],
                               Icons.contact_emergency_outlined,
                             ),
                             buildDetail(
-                              'Contact Phone',
+                              _t('Contact Phone'),
                               patient!['emergency_contact_phone'],
                               Icons.phone_in_talk_outlined,
                             ),

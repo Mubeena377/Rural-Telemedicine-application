@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import 'app_text.dart';
+import 'patient_reports_texts.dart';
 import 'report_file_picker.dart';
 import 'report_viewer_screen.dart';
+
+// Finds a text in the chosen language (English if it is missing).
+// It starts with _ so it belongs only to this file.
+String _t(String text) => tt(patientReportsTexts, text);
 
 // ============================================================
 // PATIENT REPORTS SCREEN
@@ -31,6 +37,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
   String? errorMessage;
 
   // The kinds of report. "type" is the exact word the server expects.
+  // "label" is the English text; it is translated when it is shown.
   final List<Map<String, dynamic>> reportTypes = const [
     {
       'type': 'Lab',
@@ -91,7 +98,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
         setState(() {
           isLoading = false;
           errorMessage =
-              'Patient information not found. Please log in again.';
+              _t('Patient information not found. Please log in again.');
         });
         return;
       }
@@ -126,7 +133,9 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
   }
 
   // The title used when the patient leaves it empty,
-  // for example "Lab report, 28 Oct"
+  // for example "Lab report, 28 Oct".
+  // It stays in English on purpose: it is saved on the server and
+  // the doctor reads it.
   String defaultTitle(String type) {
     const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -178,9 +187,9 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Upload a report',
-                      style: TextStyle(
+                    Text(
+                      _t('Upload a report'),
+                      style: const TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF26384A),
@@ -208,7 +217,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
                       ),
                       label: Text(
                         filePath == null
-                            ? 'Choose a PDF or a photo'
+                            ? _t('Choose a PDF or a photo')
                             : fileNameOf(filePath!),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -220,9 +229,9 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Tip: take a photo of a paper report with your camera first, then choose it here.',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    Text(
+                      _t('Tip: take a photo of a paper report with your camera first, then choose it here.'),
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                     const SizedBox(height: 16),
 
@@ -267,7 +276,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      item['label'] as String,
+                                      _t(item['label'] as String),
                                       textAlign: TextAlign.center,
                                       style: const TextStyle(
                                         fontSize: 12,
@@ -289,8 +298,8 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
                       onChanged: (value) => title = value,
                       maxLength: 80,
                       decoration: InputDecoration(
-                        labelText: 'Title (optional)',
-                        hintText: 'Example: Blood test',
+                        labelText: _t('Title (optional)'),
+                        hintText: _t('Example: Blood test'),
                         prefixIcon: const Icon(Icons.edit_note),
                         filled: true,
                         fillColor: const Color(0xFFF7FAFC),
@@ -320,7 +329,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
                             : () async {
                                 if (filePath == null) {
                                   setSheetState(() {
-                                    error = 'Please choose a file first.';
+                                    error = _t('Please choose a file first.');
                                   });
                                   return;
                                 }
@@ -348,7 +357,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
                                   setSheetState(() {
                                     saving = false;
                                     error = (result['message'] ??
-                                            'Could not upload the report.')
+                                            _t('Could not upload the report.'))
                                         .toString();
                                   });
                                   return;
@@ -356,12 +365,12 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
 
                                 // Saved: close the form and reload the list
                                 Navigator.pop(sheetContext);
-                                showMessage('Report uploaded.');
+                                showMessage(_t('Report uploaded.'));
                                 loadReports();
                               },
                         icon: const Icon(Icons.cloud_upload_outlined),
                         label: Text(
-                          saving ? 'Uploading...' : 'Upload',
+                          saving ? _t('Uploading...') : _t('Upload'),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -420,16 +429,16 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Delete this report?'),
+          title: Text(_t('Delete this report?')),
           content: Text((report['description'] ?? '').toString()),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Cancel'),
+              child: Text(_t('Cancel')),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Delete'),
+              child: Text(_t('Delete')),
             ),
           ],
         );
@@ -446,11 +455,11 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
     if (!mounted) return;
 
     if (result['success'] != true) {
-      showMessage((result['message'] ?? 'Could not delete.').toString());
+      showMessage((result['message'] ?? _t('Could not delete.')).toString());
       return;
     }
 
-    showMessage('Report deleted.');
+    showMessage(_t('Report deleted.'));
     loadReports();
   }
 
@@ -473,22 +482,22 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'My Reports',
-                  style: TextStyle(
+                  _t('My Reports'),
+                  style: const TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
-                  'Keep your test results and scans in one place.',
-                  style: TextStyle(fontSize: 13, color: Colors.white70),
+                  _t('Keep your test results and scans in one place.'),
+                  style: const TextStyle(fontSize: 13, color: Colors.white70),
                 ),
               ],
             ),
@@ -553,7 +562,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${info['label']} • ${report['report_date'] ?? ''}',
+                          '${_t(info['label'] as String)} • ${report['report_date'] ?? ''}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: Colors.grey,
@@ -566,7 +575,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, color: Colors.red),
-                tooltip: 'Delete',
+                tooltip: _t('Delete'),
                 onPressed: () => deleteReport(report),
               ),
             ],
@@ -587,14 +596,14 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFDCE5EE)),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Icon(Icons.upload_file, size: 56, color: Colors.grey),
-          SizedBox(height: 10),
+          const Icon(Icons.upload_file, size: 56, color: Colors.grey),
+          const SizedBox(height: 10),
           Text(
-            'No reports yet.\nTap "Upload" to add a test result or a scan.',
+            _t('No reports yet.\nTap "Upload" to add a test result or a scan.'),
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey),
+            style: const TextStyle(color: Colors.grey),
           ),
         ],
       ),
@@ -625,7 +634,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
               ElevatedButton.icon(
                 onPressed: loadReports,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                label: Text(_t('Retry')),
               ),
             ],
           ),
@@ -656,7 +665,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
-        title: const Text('My Reports'),
+        title: Text(_t('My Reports')),
         backgroundColor: const Color(0xFF3F6FA8),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -666,7 +675,7 @@ class _PatientReportsScreenState extends State<PatientReportsScreen> {
         backgroundColor: const Color(0xFF3F6FA8),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.cloud_upload_outlined),
-        label: const Text('Upload'),
+        label: Text(_t('Upload')),
       ),
       body: buildBody(),
     );

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import 'order_medicine_text.dart'; // tx() shows text in the chosen language
 
 // ============================================================
 // ORDER MEDICINE SCREEN
 // Lets the patient order the medicines of one prescription.
+// Every fixed sentence goes through tx(), so it follows the language the
+// patient chose. The medicine names, doses and the address the patient
+// typed are shown as written.
 // ============================================================
 
 class OrderMedicineScreen extends StatefulWidget {
@@ -30,8 +34,8 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
   // True while the order is being sent (stops double taps)
   bool placing = false;
 
-  // The payment choices: the first value goes to the server,
-  // the second is the text shown on the screen
+  // The payment choices: the first value goes to the server (it stays
+  // as it is), the second is the English text, translated when shown
   final List<List<String>> paymentOptions = const [
     ['COD', 'Cash on delivery'],
     ['UPI', 'UPI'],
@@ -61,7 +65,7 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
     // The address is required
     final address = addressController.text.trim();
     if (address.isEmpty) {
-      showMessage('Please enter your delivery address.');
+      showMessage(tx('Please enter your delivery address.'));
       return;
     }
 
@@ -71,7 +75,7 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
 
     if (patientId == null) {
       if (!mounted) return;
-      showMessage('Patient information not found. Please log in again.');
+      showMessage(tx('Patient information not found. Please log in again.'));
       return;
     }
 
@@ -96,7 +100,9 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
 
     // If the server refused, show its message and stay on this screen
     if (result['success'] != true) {
-      showMessage(result['message'] ?? 'Failed to place the order.');
+      showMessage(
+        (result['message'] ?? tx('Failed to place the order.')).toString(),
+      );
       return;
     }
 
@@ -109,7 +115,7 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
       barrierDismissible: false,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Order Placed'),
+          title: Text(tx('Order Placed')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -120,15 +126,18 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
               ),
               const SizedBox(height: 15),
               Text(
-                'Your order number is ${result['order_id']}.',
+                // {id} is replaced with the real order number
+                tx('Your order number is {id}.')
+                    .replaceAll('{id}', '${result['order_id']}'),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 // A total of 0 means the catalog has no price yet
                 total > 0
-                    ? 'Total: ₹${total.toStringAsFixed(2)}'
-                    : 'The pharmacy will confirm the price.',
+                    ? tx('Total: ₹{amount}')
+                        .replaceAll('{amount}', total.toStringAsFixed(2))
+                    : tx('The pharmacy will confirm the price.'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
@@ -139,7 +148,7 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
               onPressed: () {
                 Navigator.pop(dialogContext); // Close the popup
               },
-              child: const Text('Done'),
+              child: Text(tx('Done')),
             ),
           ],
         );
@@ -153,6 +162,7 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
 
   // Builds the short text line for one medicine, e.g.
   // "200mg • twice daily • 3 days"
+  // (the dose and the frequency are what the doctor wrote)
   String medicineSummary(Map<String, dynamic> medicine) {
     final parts = <String>[];
 
@@ -163,7 +173,8 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
       parts.add(medicine['frequency'].toString());
     }
     if (medicine['duration_days'] != null) {
-      parts.add('${medicine['duration_days']} days');
+      // The number first, then the word for "days" in the chosen language
+      parts.add('${medicine['duration_days']} ${tx('days')}');
     }
 
     return parts.join(' • ');
@@ -179,7 +190,7 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
-        title: const Text('Order Medicines'),
+        title: Text(tx('Order Medicines')),
         backgroundColor: const Color(0xFF3F6FA8),
         foregroundColor: Colors.white,
         elevation: 0,
@@ -190,18 +201,18 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ----- Medicines on this prescription -----
-            const Text(
-              'Medicines in this prescription',
-              style: TextStyle(
+            Text(
+              tx('Medicines in this prescription'),
+              style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF26384A),
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
-              '1 pack of each medicine will be ordered.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              tx('1 pack of each medicine will be ordered.'),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 10),
 
@@ -223,9 +234,9 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
             const SizedBox(height: 20),
 
             // ----- Delivery address -----
-            const Text(
-              'Delivery address',
-              style: TextStyle(
+            Text(
+              tx('Delivery address'),
+              style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF26384A),
@@ -236,7 +247,7 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
               controller: addressController,
               maxLines: 3,
               decoration: InputDecoration(
-                hintText: 'House, village, landmark, PIN code',
+                hintText: tx('House, village, landmark, PIN code'),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -249,9 +260,9 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
             const SizedBox(height: 20),
 
             // ----- Payment method -----
-            const Text(
-              'Payment method',
-              style: TextStyle(
+            Text(
+              tx('Payment method'),
+              style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF26384A),
@@ -264,7 +275,8 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
               spacing: 8,
               children: paymentOptions.map((option) {
                 return ChoiceChip(
-                  label: Text(option[1]),
+                  // Shown in the chosen language; option[0] goes to the server
+                  label: Text(tx(option[1])),
                   selected: paymentMethod == option[0],
                   onSelected: (_) {
                     setState(() {
@@ -276,9 +288,9 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
             ),
 
             const SizedBox(height: 6),
-            const Text(
-              'No payment is taken in the app. It is collected on delivery or confirmed by the pharmacy.',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
+            Text(
+              tx('No payment is taken in the app. It is collected on delivery or confirmed by the pharmacy.'),
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
             ),
 
             const SizedBox(height: 28),
@@ -297,7 +309,7 @@ class _OrderMedicineScreenState extends State<OrderMedicineScreen> {
                       )
                     : const Icon(Icons.local_pharmacy),
                 label: Text(
-                  placing ? 'Placing order...' : 'Place Order',
+                  placing ? tx('Placing order...') : tx('Place Order'),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

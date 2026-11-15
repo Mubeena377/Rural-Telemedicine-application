@@ -1,10 +1,17 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'app_text.dart';
+import 'email_support_texts.dart';
+
+// Finds a text in the chosen language (English if it is missing).
+// It starts with _ so it belongs only to this file.
+String _t(String text) => tt(emailSupportTexts, text);
 
 class EmailSupportScreen extends StatelessWidget {
   const EmailSupportScreen({super.key});
 
+  // The address itself is not translated
   static const String supportEmail =
       'support@ruraltelemedicine.example';
 
@@ -13,9 +20,9 @@ class EmailSupportScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
-        title: const Text(
-          'Email Support',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          _t('Email Support'),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.teal,
@@ -33,19 +40,20 @@ class EmailSupportScreen extends StatelessWidget {
             ),
             const SizedBox(height: 18),
 
-            const Text(
-              'We are here to help!',
-              style: TextStyle(
+            Text(
+              _t('We are here to help!'),
+              style: const TextStyle(
                 fontSize: 23,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
 
-            const Text(
-              'For assistance with appointments, video consultations, '
-              'prescriptions or other app-related issues, contact our support team.',
-              style: TextStyle(
+            Text(
+              _t(
+                'For assistance with appointments, video consultations, prescriptions or other app-related issues, contact our support team.',
+              ),
+              style: const TextStyle(
                 fontSize: 15,
                 height: 1.5,
                 color: Colors.black54,
@@ -54,9 +62,9 @@ class EmailSupportScreen extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            const Text(
-              'Our Support Email',
-              style: TextStyle(
+            Text(
+              _t('Our Support Email'),
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -86,13 +94,14 @@ class EmailSupportScreen extends StatelessWidget {
                       color: Colors.teal,
                     ),
                     onPressed: () {
+                      // Copy the address to the clipboard
                       Clipboard.setData(
                         const ClipboardData(text: supportEmail),
                       );
 
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Email address copied'),
+                        SnackBar(
+                          content: Text(_t('Email address copied')),
                         ),
                       );
                     },
@@ -103,10 +112,11 @@ class EmailSupportScreen extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            const Text(
-              'Note: This is a temporary development address. '
-              'It cannot receive emails.',
-              style: TextStyle(
+            Text(
+              _t(
+                'Note: This is a temporary development address. It cannot receive emails.',
+              ),
+              style: const TextStyle(
                 color: Colors.orange,
                 fontSize: 12,
               ),

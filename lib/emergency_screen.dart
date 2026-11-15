@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
+import 'app_text.dart';
+import 'emergency_screen_texts.dart';
+
+// Finds a text in the chosen language (English if it is missing).
+// It starts with _ so it belongs only to this file.
+String _t(String text) => tt(emergencyScreenTexts, text);
 
 class EmergencyScreen extends StatefulWidget {
   const EmergencyScreen({super.key});
@@ -92,7 +98,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           SnackBar(
             content: Text(
               result['message']?.toString() ??
-                  'Unable to load emergency contact details.',
+                  _t('Unable to load emergency contact details.'),
             ),
           ),
         );
@@ -105,8 +111,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to load emergency contact details.'),
+        SnackBar(
+          content: Text(_t('Unable to load emergency contact details.')),
         ),
       );
     }
@@ -138,7 +144,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('SOS preference saved on this device.')),
+      SnackBar(content: Text(_t('SOS preference saved on this device.'))),
     );
   }
 
@@ -148,8 +154,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
     if (name.isEmpty || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the contact name and phone number.'),
+        SnackBar(
+          content: Text(_t('Please enter the contact name and phone number.')),
         ),
       );
       return;
@@ -160,8 +166,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
     if (patientId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Patient ID not found. Please register again.'),
+        SnackBar(
+          content: Text(_t('Patient ID not found. Please register again.')),
         ),
       );
       return;
@@ -196,8 +202,8 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Emergency contact saved successfully.'),
+          SnackBar(
+            content: Text(_t('Emergency contact saved successfully.')),
           ),
         );
       } else {
@@ -205,7 +211,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
           SnackBar(
             content: Text(
               result['message']?.toString() ??
-                  'Unable to save emergency contact.',
+                  _t('Unable to save emergency contact.'),
             ),
           ),
         );
@@ -218,7 +224,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to save emergency contact.')),
+        SnackBar(content: Text(_t('Unable to save emergency contact.'))),
       );
     }
   }
@@ -230,7 +236,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
       child: ListTile(
         leading: Icon(icon, color: Colors.red.shade700),
         title: Text(label),
-        subtitle: Text(value.isEmpty ? 'Not provided' : value),
+        subtitle: Text(value.isEmpty ? _t('Not provided') : value),
       ),
     );
   }
@@ -240,7 +246,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FC),
       appBar: AppBar(
-        title: const Text('Emergency'),
+        title: Text(_t('Emergency')),
         backgroundColor: Colors.red.shade700,
         foregroundColor: Colors.white,
       ),
@@ -256,26 +262,25 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                     color: Colors.red.shade50,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.health_and_safety_rounded,
                         color: Colors.red,
                         size: 42,
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       Text(
-                        'Your Emergency Plan',
-                        style: TextStyle(
+                        _t('Your Emergency Plan'),
+                        style: const TextStyle(
                           fontSize: 21,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
                       Text(
-                        'Keep your emergency contact information '
-                        'up to date so it is ready when needed.',
+                        _t('Keep your emergency contact information up to date so it is ready when needed.'),
                       ),
                     ],
                   ),
@@ -283,9 +288,12 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
                 const SizedBox(height: 24),
 
-                const Text(
-                  'Emergency Contact',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Text(
+                  _t('Emergency Contact'),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 12),
 
@@ -294,7 +302,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                   controller: contactNameController,
                   onChanged: (_) => checkContactChanges(),
                   decoration: InputDecoration(
-                    labelText: 'Emergency Contact Name',
+                    labelText: _t('Emergency Contact Name'),
                     prefixIcon: const Icon(Icons.person_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -311,7 +319,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                   onChanged: (_) => checkContactChanges(),
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
-                    labelText: 'Emergency Contact Phone',
+                    labelText: _t('Emergency Contact Phone'),
                     prefixIcon: const Icon(Icons.phone_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -339,7 +347,7 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                             )
                           : const Icon(Icons.save_outlined),
                       label: Text(
-                        isSavingContact ? 'Saving...' : 'Save Changes',
+                        isSavingContact ? _t('Saving...') : _t('Save Changes'),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
@@ -352,18 +360,20 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
 
                 const SizedBox(height: 20),
 
-                const Text(
-                  'SOS Settings',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Text(
+                  _t('SOS Settings'),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
 
                 // Controls the user's preference for location sharing.
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Share location during SOS'),
-                  subtitle: const Text(
-                    'Preference only. Actual location sharing '
-                    'requires SOS functionality to be connected.',
+                  title: Text(_t('Share location during SOS')),
+                  subtitle: Text(
+                    _t('Preference only. Actual location sharing requires SOS functionality to be connected.'),
                   ),
                   value: shareLocationOnSOS,
                   activeColor: Colors.red,
@@ -377,17 +387,15 @@ class _EmergencyScreenState extends State<EmergencyScreen> {
                 OutlinedButton.icon(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(
-                          'SOS is not connected yet. '
-                          'If this is a real emergency in India, '
-                          'call 112.',
+                          _t('SOS is not connected yet. If this is a real emergency in India, call 112.'),
                         ),
                       ),
                     );
                   },
                   icon: const Icon(Icons.emergency),
-                  label: const Text('SOS setup status'),
+                  label: Text(_t('SOS setup status')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red.shade700,
                     padding: const EdgeInsets.all(16),

@@ -1,5 +1,11 @@
-
 import 'package:flutter/material.dart';
+
+import 'app_text.dart';
+import 'report_problem_texts.dart';
+
+// Finds a text in the chosen language (English if it is missing).
+// It starts with _ so it belongs only to this file.
+String _t(String text) => tt(reportProblemTexts, text);
 
 class ReportProblemScreen extends StatefulWidget {
   const ReportProblemScreen({super.key});
@@ -16,6 +22,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   final TextEditingController descriptionController =
       TextEditingController();
 
+  // The chosen category is always kept in ENGLISH, so it does not
+  // depend on the language when the report is sent to a server later.
+  // Only the text shown on the screen is translated.
   String selectedCategory = 'Technical Issue';
 
   final List<String> categories = [
@@ -38,17 +47,19 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     if (subjectController.text.trim().isEmpty ||
         descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all fields.'),
+        SnackBar(
+          content: Text(_t('Please fill in all fields.')),
         ),
       );
       return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'Your report has been prepared. Submission service is not connected yet.',
+          _t(
+            'Your report has been prepared. Submission service is not connected yet.',
+          ),
         ),
       ),
     );
@@ -59,9 +70,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFC),
       appBar: AppBar(
-        title: const Text(
-          'Report a Problem',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          _t('Report a Problem'),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.teal,
@@ -79,29 +90,30 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             ),
             const SizedBox(height: 15),
 
-            const Text(
-              'Tell us what went wrong',
-              style: TextStyle(
+            Text(
+              _t('Tell us what went wrong'),
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
 
-            const Text(
-              'Describe the issue so our team can understand how to help.',
-              style: TextStyle(fontSize: 14, height: 1.5),
+            Text(
+              _t('Describe the issue so our team can understand how to help.'),
+              style: const TextStyle(fontSize: 14, height: 1.5),
             ),
             const SizedBox(height: 24),
 
-            const Text(
-              'Problem Category',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            Text(
+              _t('Problem Category'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 
             DropdownButtonFormField<String>(
-              value: selectedCategory,
+              // The newer Flutter name for the starting value
+              initialValue: selectedCategory,
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white,
@@ -111,8 +123,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               ),
               items: categories.map((category) {
                 return DropdownMenuItem(
+                  // The value stays English, the shown text is translated
                   value: category,
-                  child: Text(category),
+                  child: Text(_t(category)),
                 );
               }).toList(),
               onChanged: (value) {
@@ -126,16 +139,16 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
             const SizedBox(height: 20),
 
-            const Text(
-              'Subject',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            Text(
+              _t('Subject'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 
             TextField(
               controller: subjectController,
               decoration: InputDecoration(
-                hintText: 'Enter problem subject',
+                hintText: _t('Enter problem subject'),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -146,9 +159,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
             const SizedBox(height: 20),
 
-            const Text(
-              'Description',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            Text(
+              _t('Description'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
 
@@ -156,7 +169,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               controller: descriptionController,
               maxLines: 5,
               decoration: InputDecoration(
-                hintText: 'Explain the problem in detail...',
+                hintText: _t('Explain the problem in detail...'),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -179,9 +192,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text(
-                  'Submit Report',
-                  style: TextStyle(
+                child: Text(
+                  _t('Submit Report'),
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
