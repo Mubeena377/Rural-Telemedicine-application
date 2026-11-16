@@ -33,6 +33,8 @@ import 'doctor_consultations_screen.dart';
 import 'help_support_screen.dart';
 import 'responder_push.dart';
 import 'responder_sos_screen.dart';
+import 'app_text.dart';
+import 'sos_cancel_texts.dart';
 
 final ValueNotifier<String> ambulanceStatus =
     ValueNotifier<String>('Available');
@@ -11142,6 +11144,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+// ============================================================
+// REPLACEMENT BLOCK (paste in place of the old SOSLocationScreen class)
+// Contains 3 things:
+//  1. _sosT()                 - small translation helper
+//  2. SOSLocationScreen       - the SOS countdown screen (fixed)
+//  3. SlideToCancelButton     - the new slide button
+// No new packages are needed.
+// ============================================================
+
+// Translates the new SOS texts (uses sos_cancel_texts.dart)
+String _sosT(String text) => tt(sosCancelTexts, text);
+
 class SOSLocationScreen extends StatefulWidget {
   final double latitude;
   final double longitude;
@@ -11156,14 +11170,29 @@ class SOSLocationScreen extends StatefulWidget {
   State<SOSLocationScreen> createState() => _SOSLocationScreenState();
 }
 
-  class _SOSLocationScreenState extends State<SOSLocationScreen> {
+class _SOSLocationScreenState extends State<SOSLocationScreen> {
   int remainingSeconds = 10;
   Timer? countdownTimer;
+
+  // True from the moment the patient finishes the slide.
+  // While true, nothing else can start a second cancel.
+  bool isCancelling = false;
+
+  // Changing this number rebuilds the slide button back at the start
+  // (used when cancelling fails and the patient must try again)
+  int sliderResetCount = 0;
+
+  // The id of the SOS created on the server (kept here, not only on disk,
+  // so we never cancel an OLD SOS by mistake)
+  int? currentSosId;
+
+  // Lets the cancel code wait if the SOS is still being created
+  Future<void>? sosCreation;
 
   // Plays our emergency beep file (assets/sounds/emergency_beep.wav)
   final AudioPlayer _beepPlayer = AudioPlayer();
 
-  // Plays the beep once. Called every second during the last 5 seconds.
+  // Plays the beep once. Called every second during the last 7 seconds.
   Future<void> _playEmergencyBeep() async {
     try {
       // Stop any beep still playing, so each second starts a fresh beep
@@ -11184,13 +11213,24 @@ class SOSLocationScreen extends StatefulWidget {
   void initState() {
     super.initState();
 
-    // Tell the server the SOS has started
-    activateSOSRequest();
+    // Tell the server the SOS has started (we remember the Future
+    // so that "cancel" can wait for it if needed)
+    sosCreation = activateSOSRequest();
 
-    // Count down once per second
+    // Start the 10-second countdown
+    startCountdown();
+  }
+
+  // Starts (or restarts) the countdown timer
+  void startCountdown() {
+    countdownTimer?.cancel();
+
     countdownTimer = Timer.periodic(
       const Duration(seconds: 1),
       (timer) {
+        // Do nothing while a cancel is in progress
+        if (isCancelling) return;
+
         if (remainingSeconds > 0) {
           setState(() {
             remainingSeconds--;
@@ -11217,33 +11257,107 @@ class SOSLocationScreen extends StatefulWidget {
     );
   }
 
+  // Creates the SOS on the server
   Future<void> activateSOSRequest() async {
-    final prefs = await SharedPreferences.getInstance();
+    try {
+      final prefs = await SharedPreferences.getInstance();
 
-    final patientId = prefs.getInt('patientId');
-    print('APPOINTMENTS - Patient ID: $patientId');
-    if (patientId == null) {
-      debugPrint('SOS Error: Patient ID not found');
-      return;
-    }
+      final patientId = prefs.getInt('patientId');
+      if (patientId == null) {
+        debugPrint('SOS Error: Patient ID not found');
+        return;
+      }
 
-    final result = await ApiService.activateSOS(
-      patientId: patientId,
-      latitude: widget.latitude,
-      longitude: widget.longitude,
-    );
-
-    if (result['success'] == true) {
-      debugPrint('SOS created successfully');
-      debugPrint('SOS ID: ${result['sos_id']}');
-
-      await prefs.setInt(
-        'sosId',
-        result['sos_id'],
+      final result = await ApiService.activateSOS(
+        patientId: patientId,
+        latitude: widget.latitude,
+        longitude: widget.longitude,
       );
-    } else {
-      debugPrint('SOS failed: ${result['message']}');
+
+      if (result['success'] == true) {
+        debugPrint('SOS created successfully');
+        debugPrint('SOS ID: ${result['sos_id']}');
+
+        // Keep the id in memory (used by cancel) ...
+        currentSosId = result['sos_id'];
+
+        // ... and on the phone (other screens may read it)
+        await prefs.setInt('sosId', result['sos_id']);
+      } else {
+        debugPrint('SOS failed: ${result['message']}');
+      }
+    } catch (e) {
+      debugPrint('SOS create error: $e');
     }
+  }
+
+  // Called when the patient finishes sliding.
+  // Shows "Cancelling..." at once, then tells the server.
+  Future<void> cancelSOS() async {
+    // A second call (extra slide) is ignored
+    if (isCancelling) return;
+
+    // Stop the countdown and the beep immediately,
+    // so the screen reacts the moment the slide ends
+    countdownTimer?.cancel();
+    _beepPlayer.stop();
+
+    setState(() {
+      isCancelling = true;
+    });
+
+    try {
+      // If the SOS is still being created, wait for it (max 10 seconds)
+      await sosCreation?.timeout(const Duration(seconds: 10));
+
+      final sosId = currentSosId;
+
+      // If sosId is null, the SOS was never created on the server,
+      // so there is nothing to cancel there.
+      if (sosId != null) {
+        final result = await ApiService.cancelSOS(
+          sosId: sosId,
+        ).timeout(const Duration(seconds: 10));
+
+        if (result['success'] != true) {
+          debugPrint('Cancel SOS failed: ${result['message']}');
+          cancelFailed(result['message']?.toString());
+          return;
+        }
+
+        // Forget the cancelled SOS
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('sosId');
+      }
+
+      debugPrint('SOS cancelled successfully');
+
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      debugPrint('Cancel SOS error: $e');
+      cancelFailed(null);
+    }
+  }
+
+  // Cancel did not work: put the screen back so the patient can try again
+  void cancelFailed(String? serverMessage) {
+    if (!mounted) return;
+
+    setState(() {
+      isCancelling = false;
+      sliderResetCount++; // slide button goes back to the start
+    });
+
+    // Continue the countdown
+    startCountdown();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        // A server message stays English; our own message is translated
+        content: Text(serverMessage ?? _sosT('Unable to cancel SOS')),
+      ),
+    );
   }
 
   @override
@@ -11251,7 +11365,6 @@ class SOSLocationScreen extends StatefulWidget {
     countdownTimer?.cancel();
 
     // Stop the beep and free the player when the screen closes
-    // (for example when the patient taps Cancel SOS)
     _beepPlayer.stop();
     _beepPlayer.dispose();
 
@@ -11326,7 +11439,8 @@ class SOSLocationScreen extends StatefulWidget {
                   const SizedBox(height: 8),
 
                   Text(
-                    tr('Emergency dispatch center is receiving your location.', selectedLanguage),
+                    tr('Emergency dispatch center is receiving your location.',
+                        selectedLanguage),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 14,
@@ -11339,7 +11453,7 @@ class SOSLocationScreen extends StatefulWidget {
 
             const SizedBox(height: 22),
 
-            // COORDINATES
+            // ACCESSED LOCATION (the coordinates)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
@@ -11378,7 +11492,7 @@ class SOSLocationScreen extends StatefulWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          tr('Capturing Coordinates', selectedLanguage),
+                          _sosT('Accessed Location'), // was "Capturing Coordinates"
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -11387,9 +11501,10 @@ class SOSLocationScreen extends StatefulWidget {
 
                         const SizedBox(height: 6),
 
+                        // Numbers need no translation, so this is a plain Text
                         Text(
-                          tr('Lat: ${widget.latitude.toStringAsFixed(6)}°\n'
-                          'Lon: ${widget.longitude.toStringAsFixed(6)}°', selectedLanguage),
+                          'Lat: ${widget.latitude.toStringAsFixed(6)}°\n'
+                          'Lon: ${widget.longitude.toStringAsFixed(6)}°',
                           style: const TextStyle(
                             fontSize: 13,
                             color: Colors.black54,
@@ -11440,7 +11555,8 @@ class SOSLocationScreen extends StatefulWidget {
                   const SizedBox(height: 8),
 
                   Text(
-                    tr('Registered health records will be shared with emergency medical responders.', selectedLanguage),
+                    tr('Registered health records will be shared with emergency medical responders.',
+                        selectedLanguage),
                     style: const TextStyle(
                       fontSize: 13,
                       color: Colors.black54,
@@ -11452,66 +11568,23 @@ class SOSLocationScreen extends StatefulWidget {
 
             const SizedBox(height: 28),
 
-            // CANCEL SOS
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10192F),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-
-                  final sosId = prefs.getInt('sosId');
-
-                  if (sosId == null) {
-                    debugPrint('Cancel SOS Error: SOS ID not found');
-                    return;
-                  }
-
-                  final result = await ApiService.cancelSOS(
-                    sosId: sosId,
-                  );
-
-                  if (result['success'] == true) {
-                    debugPrint('SOS cancelled successfully');
-
-                    if (!mounted) return;
-
-                    Navigator.pop(context);
-                  } else {
-                    debugPrint('Cancel SOS failed: ${result['message']}');
-
-                    if (!mounted) return;
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          result['message'] ?? 'Unable to cancel SOS',
-                        ),
-                      ),
-                    );
-                  }
-                },
-                child: Text(
-                  tr('Cancel SOS ($remainingSeconds s)', selectedLanguage),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+            // SLIDE TO CANCEL SOS (replaces the old Cancel button)
+            SlideToCancelButton(
+              // New key = the button is rebuilt at the start position
+              key: ValueKey(sliderResetCount),
+              label: isCancelling
+                  ? _sosT('Cancelling SOS...')
+                  : _sosT('Slide to cancel SOS ({seconds} s)')
+                      .replaceAll('{seconds}', '$remainingSeconds'),
+              isBusy: isCancelling,
+              onConfirmed: cancelSOS,
             ),
 
             const SizedBox(height: 15),
 
             Text(
-              tr('Your location is being securely shared for emergency assistance.', selectedLanguage),
+              tr('Your location is being securely shared for emergency assistance.',
+                  selectedLanguage),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 12,
@@ -11521,6 +11594,158 @@ class SOSLocationScreen extends StatefulWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ============================================================
+// SLIDE TO CANCEL BUTTON
+// A dark bar with a round handle. The patient drags the handle to
+// the right end to confirm. If released before ~85% of the way,
+// the handle springs back. Because it needs a deliberate slide,
+// an accidental tap cannot trigger it, and it can only fire once.
+// ============================================================
+class SlideToCancelButton extends StatefulWidget {
+  final String label; // text in the middle of the bar
+  final bool isBusy; // true while the server is being told
+  final VoidCallback onConfirmed; // called once when the slide is done
+
+  const SlideToCancelButton({
+    super.key,
+    required this.label,
+    required this.isBusy,
+    required this.onConfirmed,
+  });
+
+  @override
+  State<SlideToCancelButton> createState() => _SlideToCancelButtonState();
+}
+
+class _SlideToCancelButtonState extends State<SlideToCancelButton> {
+  static const double barHeight = 64; // height of the bar
+  static const double handleSize = 56; // size of the round handle
+  static const double gap = 4; // space around the handle
+
+  // How far the handle has moved from the left (in pixels)
+  double dragX = 0;
+
+  // True while the finger is moving the handle (no animation then)
+  bool dragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The furthest the handle can travel
+        final maxDrag = (constraints.maxWidth - handleSize - gap * 2)
+            .clamp(0.0, double.infinity)
+            .toDouble();
+
+        // While busy, the handle stays at the far end
+        final handleX = widget.isBusy ? maxDrag : dragX;
+
+        // 0.0 (start) ... 1.0 (end): used to fade the label
+        final progress = maxDrag == 0 ? 0.0 : (handleX / maxDrag);
+
+        return Container(
+          height: barHeight,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFF10192F),
+            borderRadius: BorderRadius.circular(barHeight / 2),
+          ),
+          child: Stack(
+            children: [
+              // The label in the middle (fades as the handle moves)
+              Positioned.fill(
+                child: Padding(
+                  // Keep the text clear of the handle
+                  padding: const EdgeInsets.symmetric(horizontal: handleSize + 12),
+                  child: Center(
+                    child: Opacity(
+                      opacity: (1 - progress * 0.7).clamp(0.0, 1.0),
+                      child: Text(
+                        widget.label,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // The round handle the patient drags
+              AnimatedPositioned(
+                // No animation while dragging; smooth spring-back otherwise
+                duration:
+                    dragging ? Duration.zero : const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                left: gap + handleX,
+                top: gap,
+                child: GestureDetector(
+                  // When busy, the gestures are switched off (null)
+                  onHorizontalDragStart: widget.isBusy
+                      ? null
+                      : (_) => setState(() => dragging = true),
+                  onHorizontalDragUpdate: widget.isBusy
+                      ? null
+                      : (details) {
+                          setState(() {
+                            dragX = (dragX + details.delta.dx)
+                                .clamp(0.0, maxDrag)
+                                .toDouble();
+                          });
+                        },
+                  onHorizontalDragEnd: widget.isBusy
+                      ? null
+                      : (_) {
+                          // Slid far enough (85% or more)?
+                          if (maxDrag > 0 && dragX >= maxDrag * 0.85) {
+                            setState(() {
+                              dragging = false;
+                              dragX = maxDrag;
+                            });
+                            widget.onConfirmed(); // tell the screen, once
+                          } else {
+                            // Not far enough: spring back to the start
+                            setState(() {
+                              dragging = false;
+                              dragX = 0;
+                            });
+                          }
+                        },
+                  child: Container(
+                    width: handleSize,
+                    height: handleSize,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: widget.isBusy
+                        // Spinner while the server is being told
+                        ? const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: Colors.red,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.chevron_right_rounded,
+                            color: Colors.red,
+                            size: 34,
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
