@@ -11749,7 +11749,7 @@ class _SlideToCancelButtonState extends State<SlideToCancelButton> {
     );
   }
 }
-
+//LOcation of the hospital is being fetched by the system and patient
 class LocatingHospitalsScreen extends StatefulWidget {
   const LocatingHospitalsScreen({super.key});
 
