@@ -10759,13 +10759,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: tr('Language', selectedLanguage),
                     subtitle: tr('Choose language', selectedLanguage),
                     iconColor: Colors.orange,
-                    onTap: () async {
+                                        onTap: () async {
+                      // Open the language screen and wait until it closes
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const ChooseLanguage(),
                         ),
                       );
+
+                      // Back on the profile page: rebuild it so every text
+                      // shows the newly chosen language straight away
+                      if (!mounted) return;
+                      setState(() {});
                     },
                   ),
                 ),

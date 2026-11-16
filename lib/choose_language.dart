@@ -1,7 +1,7 @@
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'main.dart';
+import 'choose_language_texts.dart'; // the 8-language texts for this screen
 
 class ChooseLanguage extends StatefulWidget {
   const ChooseLanguage({super.key});
@@ -64,6 +64,14 @@ class _ChooseLanguageState extends State<ChooseLanguage> {
     },
   ];
 
+  // Translates one English text using the language chosen on THIS screen.
+  // Because "selectedLanguage" changes with setState() when a card is tapped,
+  // every text on this screen changes at that same moment.
+  // If a text or language is missing, the English text is shown.
+  String _t(String text) {
+    return chooseLanguageTexts[text]?[selectedLanguage] ?? text;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -90,9 +98,9 @@ class _ChooseLanguageState extends State<ChooseLanguage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8F7),
       appBar: AppBar(
-        title: const Text(
-          'Choose Language',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          _t('Choose Language'),
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: const Color(0xFFF5F8F7),
         foregroundColor: const Color(0xFF173D35),
@@ -114,27 +122,28 @@ class _ChooseLanguageState extends State<ChooseLanguage> {
                         color: primaryColor,
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: const Column(
+                      // (no "const" on this Column because the texts are translated)
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.translate_rounded,
                             color: Colors.white,
                             size: 38,
                           ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           Text(
-                            'Your language, your comfort',
-                            style: TextStyle(
+                            _t('Your language, your comfort'),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 23,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Text(
-                            'Choose a language to use the telemedicine app comfortably.',
-                            style: TextStyle(
+                            _t('Choose a language to use the telemedicine app comfortably.'),
+                            style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 14,
                               height: 1.5,
@@ -144,18 +153,18 @@ class _ChooseLanguageState extends State<ChooseLanguage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      'Select your language',
-                      style: TextStyle(
+                    Text(
+                      _t('Select your language'),
+                      style: const TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF173D35),
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'You can change this later in your profile.',
-                      style: TextStyle(
+                    Text(
+                      _t('You can change this later in your profile.'),
+                      style: const TextStyle(
                         color: Colors.black54,
                         fontSize: 13,
                       ),
@@ -182,6 +191,8 @@ class _ChooseLanguageState extends State<ChooseLanguage> {
                           onTap: () async {
                             final newLanguage = language['code']!;
 
+                            // This setState makes THIS screen change language
+                            // at once (see _t above).
                             setState(() {
                               selectedLanguage = newLanguage;
                             });
@@ -284,18 +295,19 @@ class _ChooseLanguageState extends State<ChooseLanguage> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Row(
+                  // (no "const" on this Row because the text is translated)
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Continue',
-                        style: TextStyle(
+                        _t('Continue'),
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_rounded),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_rounded),
                     ],
                   ),
                 ),
