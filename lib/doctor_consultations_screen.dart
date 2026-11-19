@@ -346,18 +346,15 @@ class _DoctorConsultationQueueScreenState
               width: double.infinity,
               height: 46,
               child: ElevatedButton.icon(
-                // Disabled (null) until the appointment time arrives
-                onPressed: canStart ? () => startConsultation(consultation) : null,
+                
+                onPressed: () => startConsultation(consultation),
                 icon: const Icon(Icons.video_call, size: 20),
                 label: Text(
-                  // Before the time arrives, say when it starts
-                  canStart
-                      ? 'Start Consultation'
-                      : 'Starts ${consultation['startsAt']}',
+                   'Start Consultation', // always available, any time
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3F6FA8),
+                  backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

@@ -2,6 +2,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'app_language.dart';
 import 'app_text.dart';
@@ -84,9 +85,10 @@ Future<pw.ThemeData?> _themeFor(String language) async {
   }
 }
 
-// The main function. Give it one prescription (the same map the
-// server sends) and it creates and shows the PDF.
-Future<void> downloadPrescriptionPdf(
+// Builds the prescription PDF and gives it back as bytes.
+// Give it one prescription (the same map the server sends).
+// It is used by both "View PDF" and "Share / Save PDF".
+Future<Uint8List> buildPrescriptionPdfBytes(
   Map<String, dynamic> prescription,
 ) async {
   // The font for the chosen language (null = English)
@@ -287,10 +289,20 @@ Future<void> downloadPrescriptionPdf(
     ),
   );
 
-  // Open Android's share sheet. The patient taps WhatsApp (or any other
-  // app), Drive, Bluetooth and so on, and the PDF file is sent or saved.
+  // Give back the finished PDF as bytes
+  return doc.save();
+}
+
+// Share / Save: builds the PDF, then opens Android's share sheet.
+// The patient taps WhatsApp (or any other app), Drive, Bluetooth and so on,
+// and the PDF file is sent or saved.
+Future<void> downloadPrescriptionPdf(
+  Map<String, dynamic> prescription,
+) async {
+  final bytes = await buildPrescriptionPdfBytes(prescription);
+
   await Printing.sharePdf(
-    bytes: await doc.save(), // The finished PDF as bytes
-    filename: 'prescription_$prescriptionId.pdf', // Name of the file
+    bytes: bytes, // The finished PDF as bytes
+    filename: 'prescription_${_text(prescription['prescription_id'])}.pdf',
   );
 }

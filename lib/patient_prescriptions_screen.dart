@@ -4,6 +4,7 @@ import 'api_service.dart';
 import 'prescription_pdf.dart';
 import 'order_medicine_screen.dart';
 import 'patient_prescriptions_text.dart'; // tx() shows text in the chosen language
+import 'report_viewer_screen.dart';
 
 // ============================================================
 // PATIENT PRESCRIPTIONS SCREEN
@@ -249,6 +250,30 @@ class _PatientPrescriptionsScreenState
             ),
 
             const SizedBox(height: 8),
+              // Button that shows the PDF on the screen (no saving needed)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  // The viewer builds the PDF and shows it page by page
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ReportViewerScreen(
+                        title: prescription['doctor_name']?.toString() ??
+                            tx('Doctor'),
+                        fileKind: 'pdf',
+                        loadFile: () => buildPrescriptionPdfBytes(prescription),
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.visibility_outlined),
+                label: Text(tx('View PDF')),
+              ),
+            ),
+
+            const SizedBox(height: 8),          
 
             // Button that creates the PDF for this prescription
             SizedBox(

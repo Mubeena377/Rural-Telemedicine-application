@@ -12,7 +12,7 @@ class ApiService {
   // (find it in the Flask terminal: "Running on http://192...").
   // ----------------------------------------------------------
   static const bool useRealPhones = false;
-  static const String computerAddress = '192.168.88.31';
+  static const String computerAddress = '192.168.88.8';
 
   static const String baseUrl = useRealPhones
       ? 'http://$computerAddress:5000'

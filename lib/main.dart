@@ -36,6 +36,7 @@ import 'responder_sos_screen.dart';
 import 'app_text.dart';
 import 'sos_cancel_texts.dart';
 
+
 final ValueNotifier<String> ambulanceStatus =
     ValueNotifier<String>('Available');
 List<Map<String, dynamic>> bookedAppointments = [];
@@ -5693,7 +5694,8 @@ class _TriageScreenState extends State<TriageScreen> {
   final TextEditingController symptomController =
       TextEditingController();
 
-  String? uploadedFile;
+  String? uploadedFile; // The file name shown on the screen
+  String? uploadedFilePath; // Where the chosen file is on the phone
 
   @override
   void dispose() {
@@ -5701,90 +5703,6 @@ class _TriageScreenState extends State<TriageScreen> {
     super.dispose();
   }
 
-  // ------------------------------------------------------------
-  // UPLOAD OPTIONS
-  // ------------------------------------------------------------
-
-  void showUploadOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                 Text(
-                  tr('Upload Medical Information',selectedLanguage),
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                ListTile(
-                  leading: const Icon(
-                    Icons.camera_alt,
-                    color: Colors.teal,
-                  ),
-                  title: Text(tr('Take Photo', selectedLanguage)),
-                  subtitle: Text(tr('Capture a medical image', selectedLanguage)),
-                  onTap: () {
-                    Navigator.pop(context);
-
-                    setState(() {
-                      uploadedFile = tr('Photo selected', selectedLanguage);
-                    });
-                  },
-                ),
-
-                ListTile(
-                  leading: const Icon(
-                    Icons.photo_library,
-                    color: Colors.teal,
-                  ),
-                  title: Text(tr('Upload Photo', selectedLanguage)),
-                  subtitle: Text(tr('Choose an image from your device', selectedLanguage)),
-                  onTap: () {
-                    Navigator.pop(context);
-
-                    setState(() {
-                      uploadedFile =
-                          tr('Medical photo selected', selectedLanguage);
-                    });
-                  },
-                ),
-
-                ListTile(
-                  leading: const Icon(
-                    Icons.description,
-                    color: Colors.teal,
-                  ),
-                  title: Text(
-                    tr('Upload Medical Report', selectedLanguage),
-                  ),
-                  subtitle: Text(
-                    tr('Choose a report from your device',selectedLanguage),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-
-                    setState(() {
-                      uploadedFile =
-                          tr('Medical report selected', selectedLanguage);
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   // ------------------------------------------------------------
   // VOICE
@@ -5807,14 +5725,11 @@ class _TriageScreenState extends State<TriageScreen> {
   Future<void> analyzeSymptoms() async {
   final symptoms = symptomController.text.trim();
 
-  if (symptoms.isEmpty && uploadedFile == null) {
+    if (symptoms.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          tr(
-            'Please describe your symptoms or upload medical information.',
-            selectedLanguage,
-          ),
+          'Please describe your symptoms or upload medical information.',
         ),
       ),
     );
@@ -6147,105 +6062,26 @@ class _TriageScreenState extends State<TriageScreen> {
 
            SizedBox(height: 25),
 
-            // --------------------------------------------------
-            // UPLOAD
-            // --------------------------------------------------
-
-            Text(
-              tr('Upload Medical Information', selectedLanguage),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                        // Hint: reports are uploaded in My Reports, not here
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
               ),
-            ),
-
-            const SizedBox(height: 10),
-
-            GestureDetector(
-              onTap: showUploadOptions,
-
-              child: Container(
-                width: double.infinity,
-
-                padding:
-                    const EdgeInsets.symmetric(
-                  vertical: 25,
-                  horizontal: 18,
-                ),
-
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius:
-                      BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.teal.shade200,
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.folder_open, color: Colors.blue),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Have a medical report? Upload it in My Reports so your doctor can see it.',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
-                ),
-
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.cloud_upload_outlined,
-                      size: 48,
-                      color:
-                          Colors.teal.shade600,
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Text(
-                      tr('Upload Photo or Medical Report', selectedLanguage),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight:
-                            FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 5),
-
-                    Text(
-                      tr('Tap to choose a photo, camera image or report', selectedLanguage),
-                      textAlign:
-                          TextAlign.center,
-
-                      style: TextStyle(
-                        color:
-                            Colors.grey.shade600,
-                        fontSize: 13,
-                      ),
-                    ),
-
-                    if (uploadedFile != null) ...[
-                      const SizedBox(height: 12),
-
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.center,
-
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                            size: 20,
-                          ),
-
-                          const SizedBox(width: 6),
-
-                          Text(
-                            uploadedFile!,
-                            style:
-                                const TextStyle(
-                              color: Colors.green,
-                              fontWeight:
-                                  FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
+                ],
               ),
             ),
 

@@ -135,6 +135,16 @@ const Map<String, Map<String, String>> prescriptionsText = {
     'mr_IN': 'माझी प्रिस्क्रिप्शन',
     'bn_IN': 'আমার প্রেসক্রিপশন',
   },
+    'View PDF': {
+    'en_IN': 'View PDF',
+    'hi_IN': 'पीडीएफ़ देखें',
+    'kn_IN': 'ಪಿಡಿಎಫ್ ವೀಕ್ಷಿಸಿ',
+    'ta_IN': 'PDF-ஐப் பார்க்கவும்',
+    'te_IN': 'PDF చూడండి',
+    'ml_IN': 'PDF കാണുക',
+    'mr_IN': 'PDF पहा',
+    'bn_IN': 'PDF দেখুন',
+  },
 };
 
 // Looks up the text in the language the user chose.
